@@ -1,0 +1,27 @@
+{
+  "name": "tayaswap-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "format": "biome format --max-diagnostics 100 --write ./",
+    "lint": "biome lint --write --unsafe --max-diagnostics 100 ./",
+    "start": "wrangler dev",
+    "typegen": "wrangler types"
+  },
+  "dependencies": {
+    "chanfana": "2.6.3",
+    "graphql-request": "7.1.2",
+    "hono": "4.7.4",
+    "viem": "2.23.10",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@cloudflare/workers-types": "4.20250311.0",
+    "@types/node": "22.13.10",
+    "typescript": "5.8.2",
+    "wrangler": "3.114.1"
+  }
+}
