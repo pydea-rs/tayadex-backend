@@ -1,1 +1,3 @@
-export * from './graphql'
+export * from "./graphql";
+
+export * from "./prisma";
