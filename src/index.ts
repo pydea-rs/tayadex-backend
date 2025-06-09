@@ -1,4 +1,4 @@
-import { GetQuote, GetTaskVerify, GetUsersRoute } from "@/controllers";
+import { GetQuote, GetSingleUserRoute, GetTaskVerify, GetUsersRoute } from "@/controllers";
 import { fromHono } from "chanfana";
 import { Hono } from "hono";
 
@@ -12,5 +12,5 @@ openapi.get("/api/tasks/:id", GetTaskVerify);
 openapi.get("/api/quote", GetQuote);
 
 openapi.get("api/user", GetUsersRoute);
-
+openapi.get("api/user/:ident", GetSingleUserRoute);
 export default app;

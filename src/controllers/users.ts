@@ -31,3 +31,41 @@ export class GetUsersRoute extends OpenAPIRoute {
     });
   }
 }
+
+export class GetSingleUserRoute extends OpenAPIRoute {
+  schema = {
+    request: {
+      params: z.object({
+        ident: z.string().describe("User id or wallet address"),
+      }),
+    },
+    responses: {
+      200: {
+        description: "Get single user endpoint",
+        content: {
+          "application/json": {
+            schema: UserSchema,
+          },
+        },
+      },
+    },
+  };
+
+  async handle(ctx: AppContext) {
+    const {
+      params: { ident },
+    } = await this.getValidatedData<typeof this.schema>();
+
+    if (!isNaN(+ident)) {
+      return prisma.user.findFirstOrThrow({
+        where: { id: +ident },
+      });
+    }
+    const user = await prisma.user.findFirst({ where: { address: ident } });
+    if (!user) {
+      // TODO: check ident being valid address
+      return prisma.user.create({ data: { address: ident } });
+    }
+    return user;
+  }
+}
