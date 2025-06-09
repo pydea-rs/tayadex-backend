@@ -1,9 +1,9 @@
-import type { IPairData } from '@/services'
+import type { IPairTokenData } from '@/services'
 import { TradeDirection } from '@/types'
 import { parseUnits } from 'viem'
 import { getAmountIn, getAmountOut } from './uniswapv2'
 
-function existsPool(tokenA: string, tokenB: string, pools: IPairData[]): boolean {
+function existsPool(tokenA: string, tokenB: string, pools: IPairTokenData[]): boolean {
   for (let i = 0; i < pools.length; i++) {
     const p = pools[i]
     if (
@@ -16,7 +16,7 @@ function existsPool(tokenA: string, tokenB: string, pools: IPairData[]): boolean
   return false
 }
 
-function getPool(tokenA: string, tokenB: string, pools: IPairData[]): IPairData | undefined {
+function getPool(tokenA: string, tokenB: string, pools: IPairTokenData[]): IPairTokenData | undefined {
   return pools.find(
     (p) =>
       (p.token0.id.toLowerCase() === tokenA.toLowerCase() && p.token1.id.toLowerCase() === tokenB.toLowerCase()) ||
@@ -24,14 +24,14 @@ function getPool(tokenA: string, tokenB: string, pools: IPairData[]): IPairData 
   )
 }
 
-function getReservesForSwap(tokenA: string, pool: IPairData): { reserveIn: bigint; reserveOut: bigint } {
+function getReservesForSwap(tokenA: string, pool: IPairTokenData): { reserveIn: bigint; reserveOut: bigint } {
   if (tokenA.toLowerCase() === pool.token0.id.toLowerCase()) {
     return { reserveIn: parseUnits(pool.reserve0, 18), reserveOut: parseUnits(pool.reserve1, 18) }
   }
   return { reserveIn: parseUnits(pool.reserve1, 18), reserveOut: parseUnits(pool.reserve0, 18) }
 }
 
-function calculateIdealTrade(amount: bigint, route: string[], pools: IPairData[], direction: TradeDirection): bigint {
+function calculateIdealTrade(amount: bigint, route: string[], pools: IPairTokenData[], direction: TradeDirection): bigint {
   let ideal: bigint = amount
   if (route.length === 0) return ideal
 
@@ -62,7 +62,7 @@ async function findBestRoute(
   amount: bigint,
   tokenIn: string,
   tokenOut: string,
-  pools: IPairData[],
+  pools: IPairTokenData[],
   direction: TradeDirection
 ): Promise<{ route: string[]; output: bigint; priceImpact: number; suggestedSlippage: number }> {
   if (amount === 0n) return { route: [], output: 0n, priceImpact: 0, suggestedSlippage: 0 }

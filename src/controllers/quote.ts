@@ -1,5 +1,5 @@
 import { error } from '@/responses'
-import { type IPairTokenData, getPools } from '@/services'
+import { type ISingleTokenData, getPools } from '@/services'
 import {
   type AppContext,
   ERROR_ADDRESS_TOKEN,
@@ -87,7 +87,7 @@ export class GetQuote extends OpenAPIRoute {
 
     const pools = await getPools(context)
 
-    const tokens: Record<string, IPairTokenData> = pools.reduce(
+    const tokens: Record<string, ISingleTokenData> = pools.reduce(
       (acc, pair) => {
         const token0Key = pair.token0.id.toLowerCase()
         const token1Key = pair.token1.id.toLowerCase()
@@ -99,7 +99,7 @@ export class GetQuote extends OpenAPIRoute {
         }
         return acc
       },
-      {} as Record<string, IPairTokenData>
+      {} as Record<string, ISingleTokenData>
     )
 
     const tokenIn = tokens[fromToken]
