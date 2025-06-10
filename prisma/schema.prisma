@@ -14,10 +14,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model User {
-  id    Int     @id @default(autoincrement())
-  name  String?
-  email String?  @unique
-  address  String @unique
+  id      Int     @id @default(autoincrement())
+  name    String?
+  email   String? @unique
+  address String  @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
+
+model Block {
+  id           Int            @id @default(autoincrement())
+  number       BigInt         @unique
+  hash         String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  processedTransactions ProcessedTransaction[]
+}
+
+enum TransactionType {
+  SWAP
+  MINT
+  BURN
+  TRANSFER
+  OTHER
+}
+
+model ProcessedTransaction {
+  id          Int             @id @default(autoincrement())
+  hash        String
+  blockId     Int
+  block       Block           @relation(fields: [blockId], references: [id])
+  from        String?
+  to          String?
+  amount      Int
+  type        TransactionType @default(SWAP)
+  createdAt   DateTime        @default(now())
+  processedAt DateTime?
+}
+
+
