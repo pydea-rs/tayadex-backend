@@ -1,8 +1,6 @@
-import { IPairTokenMinimalData } from "./common";
+import { IPairTokenMinimalData, IPairTokenSufficientData } from "./common";
 import { tayaswapSubpgrah } from "./constants";
 import { GET_USER_SWAPS } from "./queries";
-
-
 
 export interface ISwapOperation {
   id: number;
@@ -15,7 +13,7 @@ export interface ISwapOperation {
 }
 
 export interface ISwapQueryResult {
-  swaps: ISwapOperation[]
+  swaps: ISwapOperation[];
 }
 
 export async function fetchUserSwaps(address: string) {
@@ -23,4 +21,19 @@ export async function fetchUserSwaps(address: string) {
     address,
   })) as ISwapQueryResult;
   return swaps;
+}
+
+export interface ITransactionMinimalData {
+  id: string; // TODO: Check if this is id or hash
+}
+export interface INewSwapData extends ISwapOperation {
+  pair: IPairTokenSufficientData;
+  from: string;
+  to: string;
+  blockNumber: number | bigint;
+  transaction: ITransactionMinimalData;
+}
+
+export interface INewSwapQueryResult {
+  swaps: INewSwapData[];
 }

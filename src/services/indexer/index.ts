@@ -1,8 +1,9 @@
 import { Block, TransactionType } from "@prisma/client";
 import { tayaswapSubpgrah } from "../graphql/constants";
-import { GET_NEW_SWAPS, GET_NEW_LIQUIDITY } from "../graphql/eventQueries";
+import { GET_NEW_SWAPS, GET_NEW_LIQUIDITY } from "../graphql/queries";
 import { PointService } from "../point";
 import { prisma } from "../prisma";
+import { INewSwapData, INewSwapQueryResult } from "../graphql";
 
 export class EventIndexer {
   private pointService: PointService;
@@ -35,9 +36,9 @@ export class EventIndexer {
   private async indexSwaps(lastBlock: bigint) {
     console.log(`Indexing swaps from block ${lastBlock}`);
 
-    const { swaps } = await tayaswapSubpgrah(GET_NEW_SWAPS, {
+    const { swaps } = (await tayaswapSubpgrah(GET_NEW_SWAPS, {
       lastBlock: lastBlock.toString(),
-    });
+    })) as INewSwapQueryResult;
 
     let maxBlock = lastBlock;
 

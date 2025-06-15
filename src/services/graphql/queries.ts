@@ -92,3 +92,99 @@ export const GET_USER_LIQUIDITY = gql`
     }
   }
 `;
+
+export const GET_NEW_SWAPS = gql`
+  query NewSwaps($lastBlock: BigInt!) {
+    swaps(
+      first: 1000
+      orderBy: blockNumber
+      orderDirection: asc
+      where: { blockNumber_gt: $lastBlock }
+    ) {
+      id
+      from
+      to
+      amount0In
+      amount1In
+      amount0Out
+      amount1Out
+      blockNumber
+      timestamp
+      transaction {
+        id
+      }
+      pair {
+        id
+        token0 {
+          symbol
+          decimals
+        }
+        token1 {
+          symbol
+          decimals
+        }
+      }
+    }
+  }
+`;
+
+export const GET_NEW_LIQUIDITY = gql`
+  query NewLiquidity($lastBlock: BigInt!) {
+    mints(
+      first: 1000
+      orderBy: blockNumber
+      orderDirection: asc
+      where: { blockNumber_gt: $lastBlock }
+    ) {
+      id
+      sender
+      to
+      amount0
+      amount1
+      blockNumber
+      timestamp
+      transaction {
+        id
+      }
+      pair {
+        id
+        token0 {
+          symbol
+          decimals
+        }
+        token1 {
+          symbol
+          decimals
+        }
+      }
+    }
+    burns(
+      first: 1000
+      orderBy: blockNumber
+      orderDirection: asc
+      where: { blockNumber_gt: $lastBlock }
+    ) {
+      id
+      sender
+      to
+      amount0
+      amount1
+      blockNumber
+      timestamp
+      transaction {
+        id
+      }
+      pair {
+        id
+        token0 {
+          symbol
+          decimals
+        }
+        token1 {
+          symbol
+          decimals
+        }
+      }
+    }
+  }
+`;
