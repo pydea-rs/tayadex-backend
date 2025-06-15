@@ -1,8 +1,8 @@
+import { Block, TransactionType } from "@prisma/client";
 import { tayaswapSubpgrah } from "../graphql/constants";
 import { GET_NEW_SWAPS, GET_NEW_LIQUIDITY } from "../graphql/eventQueries";
 import { PointService } from "../point";
 import { prisma } from "../prisma";
-import { Block, TransactionType } from "./../../../generated/prisma/index.d"; // FIXME: How to connect prisma
 
 export class EventIndexer {
   private pointService: PointService;
@@ -202,7 +202,7 @@ export class EventIndexer {
     txHash: string,
     eventType: TransactionType | string // TODO: Is this required?
   ): Promise<boolean> {
-    return prisma.processedTranaction.findFirst({
+    return prisma.processedTransaction.findFirst({
       where: { hash: txHash, type: eventType as TransactionType },
     });
   }
@@ -215,12 +215,12 @@ export class EventIndexer {
     from?: string,
     to?: string
   ) {
-    let tx = await prisma.processedTranaction.findFirst({
+    let tx = await prisma.processedTransaction.findFirst({
       where: { hash: txHash, type: eventType as TransactionType },
     });
 
     if (!tx) {
-      tx = await prisma.processedTranaction.create({
+      tx = await prisma.processedTransaction.create({
         data: {
           hash: txHash,
           type: eventType as TransactionType,
@@ -233,7 +233,7 @@ export class EventIndexer {
       });
     } else {
       tx.processedAt = new Date();
-      await prisma.processedTranaction.update({
+      await prisma.processedTransaction.update({
         data: tx,
         where: { id: tx.id },
       });
