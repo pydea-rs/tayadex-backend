@@ -10,17 +10,28 @@ import {
 import { evaluateTokenData, TokensNumericalData } from "@/utils";
 
 export class EventIndexer {
-  private pointService: PointService;
+  private static singleInstance: EventIndexer;
 
-  constructor() {
-    this.pointService = new PointService();
+  static get() {
+    if (EventIndexer.singleInstance) {
+      return EventIndexer.singleInstance;
+    }
+    return new EventIndexer(PointService.get());
   }
 
-  async indexNewEvents() {
+  private constructor(private readonly pointService: PointService) {
+    if (EventIndexer.singleInstance) {
+      return EventIndexer.singleInstance; // Double check re-instanciation block.
+    }
+  }
+
+  async listen() {
     try {
       const lastBlock = await this.getLastProcessedBlock();
       console.log(
-        `Listening for Events, starting from block#${lastBlock?.number ?? "ZERO"}`
+        `Listening for Events, starting from block#${
+          lastBlock?.number ?? "ZERO"
+        }`
       );
 
       await Promise.all([
