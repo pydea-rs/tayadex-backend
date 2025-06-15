@@ -32,3 +32,7 @@ export interface IPairTokenData {
   volumeUSD: string;
   reserveUSD: string;
 }
+
+export interface ITransactionMinimalData {
+  id: string; // TODO: Check if this is id or hash
+}

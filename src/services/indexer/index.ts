@@ -3,7 +3,7 @@ import { tayaswapSubpgrah } from "../graphql/constants";
 import { GET_NEW_SWAPS, GET_NEW_LIQUIDITY } from "../graphql/queries";
 import { PointService } from "../point";
 import { prisma } from "../prisma";
-import { INewSwapData, INewSwapQueryResult } from "../graphql";
+import { INewLiquidityProvisionQueryResult, INewSwapData, INewSwapQueryResult } from "../graphql";
 
 export class EventIndexer {
   private pointService: PointService;
@@ -72,9 +72,9 @@ export class EventIndexer {
   private async indexLiquidity(lastBlock: bigint) {
     console.log(`Indexing liquidity events from block ${lastBlock}`);
 
-    const { mints, burns } = await tayaswapSubpgrah(GET_NEW_LIQUIDITY, {
+    const { mints, burns } = (await tayaswapSubpgrah(GET_NEW_LIQUIDITY, {
       lastBlock: lastBlock.toString(),
-    });
+    })) as INewLiquidityProvisionQueryResult;
 
     let maxBlock = lastBlock;
 

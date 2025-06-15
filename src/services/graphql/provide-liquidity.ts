@@ -1,16 +1,6 @@
-import { IPairTokenMinimalData } from "./common";
+import { IPairTokenMinimalData, IPairTokenSufficientData, ITransactionMinimalData } from "./common";
 import { tayaswapSubpgrah } from "./constants";
 import { GET_USER_LIQUIDITY, GET_USER_SWAPS } from "./queries";
-
-export interface ISwapPairToken {
-  symbol: string;
-}
-
-export interface ISwapPairData {
-  id: number;
-  token0: ISwapPairToken;
-  token1: ISwapPairToken;
-}
 
 export interface IMintOrBurnOperation {
   id: number;
@@ -30,4 +20,17 @@ export async function fetchUserLiquidityProvisions(address: string) {
     address,
   })) as ILiquidityProvisionQueryResult;
   return { mints, burns };
+}
+
+export interface INewMintOrBurnOperationData extends IMintOrBurnOperation {
+  pair: IPairTokenSufficientData;
+  sender: string;
+  to: string;
+  blockNumber: bigint;
+  transaction: ITransactionMinimalData;
+}
+
+export interface INewLiquidityProvisionQueryResult {
+  mints: INewMintOrBurnOperationData[];
+  burns: INewMintOrBurnOperationData[];
 }

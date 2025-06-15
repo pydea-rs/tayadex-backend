@@ -20,16 +20,15 @@ model User {
   email   String? @unique
   address String  @unique
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 }
 
 model Block {
-  id           Int            @id @default(autoincrement())
-  number       BigInt         @unique
-  hash         String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id                    Int                    @id @default(autoincrement())
+  number                BigInt                 @unique
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
   processedTransactions ProcessedTransaction[]
 }
 
@@ -42,16 +41,17 @@ enum TransactionType {
 }
 
 model ProcessedTransaction {
-  id          Int             @id @default(autoincrement())
-  hash        String
-  blockId     Int
-  block       Block           @relation(fields: [blockId], references: [id])
-  from        String?
-  to          String?
-  amount      Int
-  type        TransactionType @default(SWAP)
-  createdAt   DateTime        @default(now())
-  processedAt DateTime?
+  id           Int             @id @default(autoincrement())
+  hash         String
+  blockId      Int             @map("block_id")
+  block        Block           @relation(fields: [blockId], references: [id])
+  from         String?
+  to           String?
+  token0       String
+  token1       String?
+  token0Amount Int             @map("token0_amount")
+  token1Amount Int?            @map("token1_amount")
+  type         TransactionType @default(SWAP)
+  createdAt    DateTime        @default(now()) @map("created_at")
+  processedAt  DateTime?       @map("processed_at")
 }
-
-
