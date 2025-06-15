@@ -20,8 +20,9 @@ model User {
   email   String? @unique
   address String  @unique
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  transactions ProcessedTransaction[]
 }
 
 model Block {
@@ -45,8 +46,8 @@ model ProcessedTransaction {
   hash         String
   blockId      Int             @map("block_id")
   block        Block           @relation(fields: [blockId], references: [id])
-  from         String?
-  to           String?
+  from         String
+  to           String
   token0       String
   token1       String?
   token0Amount Int             @map("token0_amount")
@@ -54,4 +55,7 @@ model ProcessedTransaction {
   type         TransactionType @default(SWAP)
   createdAt    DateTime        @default(now()) @map("created_at")
   processedAt  DateTime?       @map("processed_at")
+
+  userId Int?  @map("user_id")
+  user   User? @relation(fields: [userId], references: [id])
 }

@@ -134,7 +134,7 @@ export const GET_NEW_LIQUIDITY = gql`
       first: 1000
       orderBy: blockNumber
       orderDirection: asc
-      where: { blockNumber_gt: $lastBlock }
+      where: { blockNumber_gte: $lastBlock }
     ) {
       id
       sender
@@ -162,7 +162,7 @@ export const GET_NEW_LIQUIDITY = gql`
       first: 1000
       orderBy: blockNumber
       orderDirection: asc
-      where: { blockNumber_gt: $lastBlock }
+      where: { blockNumber_gte: $lastBlock }
     ) {
       id
       sender

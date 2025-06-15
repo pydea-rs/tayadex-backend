@@ -1,9 +1,13 @@
-import { Block, TransactionType } from "@prisma/client";
+import { Block, ProcessedTransaction, TransactionType } from "@prisma/client";
 import { tayaswapSubpgrah } from "../graphql/constants";
 import { GET_NEW_SWAPS, GET_NEW_LIQUIDITY } from "../graphql/queries";
 import { PointService } from "../point";
 import { prisma } from "../prisma";
-import { INewLiquidityProvisionQueryResult, INewSwapData, INewSwapQueryResult } from "../graphql";
+import {
+  INewLiquidityProvisionQueryResult,
+  INewSwapQueryResult,
+} from "../graphql";
+import { evaluateTokenData, TokensNumericalData } from "@/utils";
 
 export class EventIndexer {
   private pointService: PointService;
@@ -12,215 +16,229 @@ export class EventIndexer {
     this.pointService = new PointService();
   }
 
-  // Main indexing function
   async indexNewEvents() {
     try {
-      console.log("Starting event indexing...");
-
-      // Get last processed block
       const lastBlock = await this.getLastProcessedBlock();
+      console.log(
+        `Listening for Events, starting from block#${lastBlock?.number ?? "ZERO"}`
+      );
 
-      // Index swaps
-      await this.indexSwaps(lastBlock);
-
-      // Index liquidity events
-      await this.indexLiquidity(lastBlock);
-
-      console.log("Event indexing completed");
+      await Promise.all([
+        this.checkoutSwapEvents(lastBlock),
+        this.checkoutLiquidityEvents(lastBlock),
+      ]);
     } catch (error) {
-      console.error("Error during event indexing:", error);
+      console.error("Listener failed on this round:", error);
     }
   }
 
-  // Index new swap events
-  private async indexSwaps(lastBlock: bigint) {
+  public async checkoutSwapEvents(lastBlock: Block | null) {
     console.log(`Indexing swaps from block ${lastBlock}`);
 
+    const latestBlockNumber = lastBlock?.number ?? 0n; // TODO: Decide what to do at indexer start? process from 0, or from latest block at present.
     const { swaps } = (await tayaswapSubpgrah(GET_NEW_SWAPS, {
-      lastBlock: lastBlock.toString(),
+      lastBlock: latestBlockNumber.toString(),
     })) as INewSwapQueryResult;
-
-    let maxBlock = lastBlock;
 
     for (const swap of swaps) {
       try {
-        // Check if already processed
-        const processed = await this.isTransactionProcessed(
-          swap.transaction.id,
-          TransactionType.SWAP
-        );
-        if (processed) continue;
-
-        await this.processSwapEvent(swap);
-
-        const block = await this.saveLastProcessedBlock(
-          swap.blockNumber,
-          swap.blockHash
-        ); // TODO: Do promise.all?
-        await this.markTransactionProcessed(
-          swap.transaction.id, // id or hash?
+        const block =
+          !lastBlock || lastBlock.number !== swap.blockNumber
+            ? await this.saveLastProcessedBlock(swap.blockNumber)
+            : lastBlock; // TODO: Do promise.all?
+        const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+          swap.transaction.id, // TODO: id or hash?
           TransactionType.SWAP,
-          block
+          block.id,
+          [
+            {
+              symbol: swap.pair.token0.symbol,
+              decimals: swap.pair.token0.decimals,
+              amount: swap.amount0In - swap.amount0Out,
+            },
+            {
+              symbol: swap.pair.token1.symbol,
+              decimals: swap.pair.token1.decimals,
+              amount: swap.amount1In - swap.amount1Out,
+            },
+          ],
+          swap.from,
+          swap.to
         );
+        lastBlock = block;
+
+        // TODO: Update point history...
+        if (!alreadyProcessed) {
+          await this.processNewSwapEvent(tx);
+        }
       } catch (error) {
         console.error(`Error processing swap ${swap.id}:`, error);
       }
     }
   }
 
-  // Index new liquidity events
-  private async indexLiquidity(lastBlock: bigint) {
+  public async checkoutLiquidityEvents(lastBlock: Block | null) {
     console.log(`Indexing liquidity events from block ${lastBlock}`);
 
+    const latestBlockNumber = lastBlock?.number ?? 0n; // TODO: Decide what to do at indexer start? process from 0, or from latest block at present.
+
     const { mints, burns } = (await tayaswapSubpgrah(GET_NEW_LIQUIDITY, {
-      lastBlock: lastBlock.toString(),
+      lastBlock: latestBlockNumber.toString(),
     })) as INewLiquidityProvisionQueryResult;
 
-    let maxBlock = lastBlock;
-
-    // Process mints (add liquidity)
     for (const mint of mints) {
       try {
-        const processed = await this.isTransactionProcessed(
-          mint.transaction.id,
-          "MINT"
-        );
-        if (processed) continue;
+        const block =
+          !lastBlock || lastBlock.number !== mint.blockNumber
+            ? await this.saveLastProcessedBlock(mint.blockNumber)
+            : lastBlock;
 
-        await this.processMintEvent(mint);
-        await this.markTransactionProcessed(
+        const { tx, alreadyProcessed } = await this.markTransactionProcessed(
           mint.transaction.id,
-          "MINT",
-          Number(mint.blockNumber)
+          TransactionType.MINT,
+          block.id,
+          [
+            {
+              symbol: mint.pair.token0.symbol,
+              decimals: mint.pair.token0.decimals,
+              amount: mint.amount0,
+            },
+            {
+              symbol: mint.pair.token1.symbol,
+              decimals: mint.pair.token1.decimals,
+              amount: mint.amount1,
+            },
+          ],
+          mint.sender,
+          mint.to
         );
 
-        maxBlock = Math.max(maxBlock, Number(mint.blockNumber));
+        lastBlock = block;
+        if (!alreadyProcessed) {
+          await this.processNewLiquidityEvent(tx);
+        }
       } catch (error) {
         console.error(`Error processing mint ${mint.id}:`, error);
       }
     }
 
-    // Process burns (remove liquidity)
     for (const burn of burns) {
       try {
-        const processed = await this.isTransactionProcessed(
-          burn.transaction.id,
-          "BURN"
-        );
-        if (processed) continue;
+        const block =
+          !lastBlock || lastBlock.number !== burn.blockNumber
+            ? await this.saveLastProcessedBlock(burn.blockNumber)
+            : lastBlock;
 
-        await this.processBurnEvent(burn);
-        await this.markTransactionProcessed(
+        const { tx, alreadyProcessed } = await this.markTransactionProcessed(
           burn.transaction.id,
-          "BURN",
-          Number(burn.blockNumber)
+          TransactionType.BURN,
+          block.id,
+          [
+            {
+              symbol: burn.pair.token0.symbol,
+              decimals: burn.pair.token0.decimals,
+              amount: -burn.amount0, // TODO: Checkout the sign of the Burn events amount
+            },
+            {
+              symbol: burn.pair.token1.symbol,
+              decimals: burn.pair.token1.decimals,
+              amount: -burn.amount1, // TODO: Checkout the sign of the Burn events amount
+            },
+          ],
+          burn.sender,
+          burn.to
         );
 
-        maxBlock = Math.max(maxBlock, Number(burn.blockNumber));
+        lastBlock = block;
+        if (!alreadyProcessed) {
+          await this.processNewLiquidityEvent(tx);
+        }
       } catch (error) {
         console.error(`Error processing burn ${burn.id}:`, error);
       }
     }
   }
 
-  // Process individual swap event
-  private async processSwapEvent(swap: any) {
-    const userAddress = swap.from.toLowerCase();
-
-    // Calculate total swap amount in wei
-    const amount0In = BigInt(swap.amount0In || 0);
-    const amount1In = BigInt(swap.amount1In || 0);
-    const totalAmount = amount0In + amount1In;
-
-    // Award points for swap
-    await this.pointService.award(
-      userAddress,
-      totalAmount,
-      swap.transaction.id,
-      Number(totalAmount)
-    );
-
-    console.log(`Awarded points for swap: ${userAddress} - ${totalAmount} wei`);
+  public async processNewSwapEvent(tx: ProcessedTransaction) {
+    const user = await prisma.user.findFirst({
+      where: { address: { equals: tx.from, mode: "insensitive" } },
+    });
+    if (!user) {
+      return; // Only registered user will be rewarded
+      // TODO/ASK: What if user registers later?
+    }
+    // Award points for swap based on specified rule:
+    await Promise.all([
+      this.pointService.award(user, tx),
+      prisma.processedTransaction.update({
+        data: { userId: user.id },
+        where: { id: tx.id },
+      }), // We save all transactions, but only reward transactions that relate to user table.
+    ]);
   }
 
-  // Process mint event (add liquidity)
-  private async processMintEvent(mint: any) {
-    const userAddress = mint.sender.toLowerCase();
+  public async processNewLiquidityEvent(tx: ProcessedTransaction) {
+    const user = await prisma.user.findFirst({
+      where: { address: { equals: tx.from, mode: "insensitive" } },
+    });
+    if (!user) {
+      return;
+    }
 
-    const amount0 = BigInt(mint.amount0 || 0);
-    const amount1 = BigInt(mint.amount1 || 0);
-    const totalAmount = amount0 + amount1;
-
-    await this.pointService.award(
-      userAddress,
-      totalAmount,
-      mint.transaction.id,
-      Number(totalAmount)
-    );
-
-    console.log(
-      `Awarded points for liquidity: ${userAddress} - ${totalAmount} wei`
-    );
+    await Promise.all([
+      this.pointService.rewardOrPunish(user, tx),
+      prisma.processedTransaction.update({
+        data: { userId: user.id },
+        where: { id: tx.id },
+      }), // We save all transactions, but only reward transactions that relate to user table.
+    ]);
   }
 
-  // Process burn event (remove liquidity)
-  private async processBurnEvent(burn: any) {
-    const userAddress = burn.sender.toLowerCase();
-
-    const amount0 = BigInt(burn.amount0 || 0);
-    const amount1 = BigInt(burn.amount1 || 0);
-    const totalAmount = amount0 + amount1;
-
-    await this.pointService.award(
-      userAddress,
-      totalAmount,
-      burn.transaction.id,
-      Number(totalAmount)
-    );
-
-    console.log(
-      `Awarded points for liquidity removal: ${userAddress} - ${totalAmount} wei`
-    );
-  }
-
-  // Database helper methods
-  private async getLastProcessedBlock(): Promise<Block> {
+  public async getLastProcessedBlock(): Promise<Block | null> {
     return prisma.block.findFirst({
       orderBy: { createdAt: "desc" },
     });
   }
 
-  private async saveLastProcessedBlock(
-    blockNumber: number | bigint,
-    blockHash: string
+  public async saveLastProcessedBlock(
+    blockNumber: number | bigint
   ): Promise<Block> {
+    const block = await prisma.block.findFirst({
+      where: { number: blockNumber },
+    });
+    if (block) {
+      return block;
+    }
     return prisma.block.create({
-      data: { number: BigInt(blockNumber), hash: blockHash },
+      data: { number: BigInt(blockNumber) },
     });
   }
 
-  private async isTransactionProcessed(
+  public async isTransactionProcessed(
     txHash: string,
     eventType: TransactionType | string // TODO: Is this required?
   ): Promise<boolean> {
-    return prisma.processedTransaction.findFirst({
-      where: { hash: txHash, type: eventType as TransactionType },
-    });
+    return Boolean(
+      await prisma.processedTransaction.findFirst({
+        where: { hash: txHash, type: eventType as TransactionType },
+      })
+    );
   }
 
-  private async markTransactionProcessed(
+  public async markTransactionProcessed(
     txHash: string,
     eventType: string | TransactionType,
     blockId: number,
-    amount: number,
-    from?: string,
-    to?: string
+    tokensData: TokensNumericalData[],
+    from: string,
+    to: string
   ) {
     let tx = await prisma.processedTransaction.findFirst({
       where: { hash: txHash, type: eventType as TransactionType },
     });
 
     if (!tx) {
+      const tokens = tokensData.map((tk) => evaluateTokenData(tk));
       tx = await prisma.processedTransaction.create({
         data: {
           hash: txHash,
@@ -228,17 +246,29 @@ export class EventIndexer {
           blockId,
           from,
           to,
-          amount,
+          token0: tokens[0].symbol,
+          token0Amount: tokens[0].amount,
+          token1: tokens[1].symbol,
+          token1Amount: tokens[1].amount,
           processedAt: new Date(),
         },
       });
     } else {
+      if (tx.processedAt) {
+        return { tx, alreadyProcessed: true };
+      }
+      const tokens = tokensData.map((tk) => evaluateTokenData(tk));
       tx.processedAt = new Date();
+      // make sure token data is synced.
+      tx.token0 = tokens[0].symbol;
+      tx.token0Amount = tokens[0].amount;
+      tx.token1 = tokens[1].symbol;
+      tx.token1Amount = tokens[1].amount;
       await prisma.processedTransaction.update({
         data: tx,
         where: { id: tx.id },
       });
     }
-    return tx;
+    return { tx, alreadyProcessed: false };
   }
 }
