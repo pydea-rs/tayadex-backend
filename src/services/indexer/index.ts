@@ -180,7 +180,7 @@ export class EventIndexer {
     }
     // Award points for swap based on specified rule:
     await Promise.all([
-      this.pointService.award(user, tx),
+      this.pointService.update(user, tx),
       prisma.processedTransaction.update({
         data: { userId: user.id },
         where: { id: tx.id },
@@ -197,7 +197,7 @@ export class EventIndexer {
     }
 
     await Promise.all([
-      this.pointService.rewardOrPunish(user, tx),
+      this.pointService.update(user, tx),
       prisma.processedTransaction.update({
         data: { userId: user.id },
         where: { id: tx.id },
