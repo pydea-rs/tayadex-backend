@@ -23,6 +23,7 @@ model User {
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
   transactions ProcessedTransaction[]
+  pointHistory PointHistory[]
 }
 
 model Block {
@@ -58,4 +59,34 @@ model ProcessedTransaction {
 
   userId Int?  @map("user_id")
   user   User? @relation(fields: [userId], references: [id])
+}
+
+enum PointSystemRuleType {
+  GENERAL
+  EVENT
+}
+
+model PointSystemRule {
+  id              Int                 @id @default(autoincrement())
+  type            PointSystemRuleType @default(GENERAL)
+  token0          String?
+  token1          String?
+  transactionType TransactionType     @default(SWAP) @map("trx_type")
+  baseValue       Float               @map("base_value")
+  relativeValue   Float               @default(0.0) @map("relative_value")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @map("updated_at")
+  pointHistory    PointHistory[]
+}
+
+model PointHistory {
+  id        BigInt       @id @default(autoincrement())
+  amount    Float
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  ruleId Int
+  rule   PointSystemRule @relation(fields: [ruleId], references: [id])
+  userId Int?            @map("user_id")
+  user   User?           @relation(fields: [userId], references: [id])
 }
