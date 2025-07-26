@@ -4,3 +4,10 @@ export const PaginationSchema = z.object({
   take: z.number().optional(),
   skip: z.number().optional(),
 });
+
+
+export const PaginationWithOrderSchema = z.object({
+  take: z.number().optional(),
+  skip: z.number().optional(),
+  decending: z.boolean().optional(),
+});

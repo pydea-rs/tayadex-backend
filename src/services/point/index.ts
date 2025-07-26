@@ -112,4 +112,71 @@ export class PointService {
             })
         );
     }
+
+    getHistory({
+        take = undefined,
+        skip = undefined,
+        userId = undefined,
+        orderDescending = false,
+    }: {
+        take?: number;
+        skip?: number;
+        userId?: number;
+        orderDescending?: boolean;
+    } = {}) {
+        // TODO: Checkout if Bigint cause problem in response
+        return prisma.pointHistory.findMany({
+            ...(userId != null ? { where: { userId } } : {}),
+            ...(take != null ? { take } : {}),
+            ...(skip != null ? { skip } : {}),
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        address: true,
+                        name: true,
+                    },
+                },
+                transaction: true,
+            },
+            orderBy: { createdAt: orderDescending ? "desc" : "asc" },
+        });
+    }
+
+    getUserHistory(
+        userId: number,
+        paginationData: {
+            take?: number;
+            skip?: number;
+            userId?: number;
+            orderDescending?: boolean;
+        } = {}
+    ) {
+        return this.getHistory({ userId, ...paginationData });
+    }
+
+    async getPointBoard() {
+        const results = await prisma.pointHistory.groupBy({
+            by: ["userId"],
+            _sum: { amount: true },
+            orderBy: {
+                _sum: {
+                    amount: "desc",
+                },
+            },
+        });
+
+        const userPoints = Object.fromEntries(
+            results.map((r) => [r.userId, r._sum.amount ?? 0])
+        );
+        return userPoints;
+    }
+
+    async getOnesPoint(userId: number) {
+        const result = await prisma.pointHistory.aggregate({
+            where: { userId },
+            _sum: { amount: true },
+        });
+        return result._sum.amount ?? 0;
+    }
 }
