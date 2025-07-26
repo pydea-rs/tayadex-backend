@@ -30,6 +30,29 @@ export class PointService {
         }); // TODO: Use Caching here.
     }
 
+    getEventRules(transactionType: TransactionType, relatedTokens: string[]) {
+        return prisma.pointSystemRule.findMany({
+            where: {
+                type: PointSystemRuleType.EVENT,
+                transactionType,
+                OR: [
+                    {
+                        token0: {
+                            in: relatedTokens,
+                            mode: "insensitive",
+                        },
+                    },
+                    {
+                        token1: {
+                            in: relatedTokens,
+                            mode: "insensitive",
+                        },
+                    },
+                ],
+            },
+        }); // TODO: Use Caching here.
+    }
+
     calculatePoint(trx: ProcessedTransaction, rule: PointSystemRule) {
         // TODO: Formula used here (esp. min and burn) is a test formula; It needs to be finalized.
         switch (rule.transactionType) {
@@ -66,5 +89,27 @@ export class PointService {
                 },
             });
         }
+
+        const eventRules = await this.getEventRules(
+            trx.type,
+            [trx.token0, trx.token1].filter((x) => x != null)
+        );
+        if (!eventRules?.length) {
+            return;
+        }
+
+        await Promise.all(
+            eventRules.map((rule) => {
+                const point = this.calculatePoint(trx, rule);
+                return prisma.pointHistory.create({
+                    data: {
+                        amount: point,
+                        ruleId: rule.id,
+                        userId: user.id,
+                        transactionId: trx.id,
+                    },
+                });
+            })
+        );
     }
 }
