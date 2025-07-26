@@ -15,15 +15,18 @@ datasource db {
 }
 
 model User {
-  id      Int     @id @default(autoincrement())
-  name    String?
-  email   String? @unique
-  address String  @unique
-
+  id           Int                    @id @default(autoincrement())
+  name         String?
+  email        String?                @unique
+  address      String                 @unique
+  referralCode String                 @unique
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
   transactions ProcessedTransaction[]
   pointHistory PointHistory[]
+
+  referrers Referral[] @relation("ReferrerUser")
+  referrees Referral[] @relation("RefereeUser")
 }
 
 model Block {
@@ -92,4 +95,17 @@ model PointHistory {
   transaction   ProcessedTransaction @relation(fields: [transactionId], references: [id])
   userId        Int?                 @map("user_id")
   user          User?                @relation(fields: [userId], references: [id])
+}
+
+model Referral {
+  createdAt DateTime @default(now())
+
+  referrer   User @relation("ReferrerUser", fields: [referrerId], references: [id])
+  referrerId Int
+  user       User @relation("RefereeUser", fields: [userId], references: [id])
+  userId     Int
+
+  layer Int @default(0)
+
+  @@id([referrerId, userId])
 }

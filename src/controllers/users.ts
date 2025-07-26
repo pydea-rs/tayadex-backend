@@ -1,6 +1,6 @@
 import { PointHistorySchema, UserSchema } from "@/models";
 import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
-import { prisma, PointService } from "@/services";
+import { prisma, PointService, ReferralService } from "@/services";
 import { AppContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
@@ -64,7 +64,12 @@ export class GetSingleUserRoute extends OpenAPIRoute {
         const user = await prisma.user.findFirst({ where: { address: ident } });
         if (!user) {
             // TODO: check ident being valid address
-            return prisma.user.create({ data: { address: ident } });
+            return prisma.user.create({
+                data: {
+                    address: ident,
+                    referralCode: await ReferralService.get().generateNewCode(),
+                },
+            });
         }
         return user;
     }
