@@ -43,7 +43,7 @@ enum TransactionType {
 }
 
 model ProcessedTransaction {
-  id           Int             @id @default(autoincrement())
+  id           BigInt          @id @default(autoincrement())
   hash         String
   blockId      Int             @map("block_id")
   block        Block           @relation(fields: [blockId], references: [id])
@@ -57,8 +57,9 @@ model ProcessedTransaction {
   createdAt    DateTime        @default(now()) @map("created_at")
   processedAt  DateTime?       @map("processed_at")
 
-  userId Int?  @map("user_id")
-  user   User? @relation(fields: [userId], references: [id])
+  userId        Int?           @map("user_id")
+  user          User?          @relation(fields: [userId], references: [id])
+  relatedPoints PointHistory[]
 }
 
 enum PointSystemRuleType {
@@ -80,13 +81,15 @@ model PointSystemRule {
 }
 
 model PointHistory {
-  id        BigInt       @id @default(autoincrement())
+  id        BigInt    @id @default(autoincrement())
   amount    Float
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @map("updated_at")
 
-  ruleId Int
-  rule   PointSystemRule @relation(fields: [ruleId], references: [id])
-  userId Int?            @map("user_id")
-  user   User?           @relation(fields: [userId], references: [id])
+  ruleId        Int
+  rule          PointSystemRule      @relation(fields: [ruleId], references: [id])
+  transactionId BigInt               @map("trx_id")
+  transaction   ProcessedTransaction @relation(fields: [transactionId], references: [id])
+  userId        Int?                 @map("user_id")
+  user          User?                @relation(fields: [userId], references: [id])
 }

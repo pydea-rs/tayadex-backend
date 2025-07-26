@@ -1,6 +1,8 @@
 import {
+    PointSystemRule,
     PointSystemRuleType,
     ProcessedTransaction,
+    TransactionType,
     User,
 } from "@prisma/client";
 import { prisma } from "../prisma";
@@ -21,15 +23,48 @@ export class PointService {
         }
     }
 
-    getGeneralRule() {
+    getGeneralRule(transactionType: TransactionType) {
         return prisma.pointSystemRule.findFirst({
-            where: { type: PointSystemRuleType.GENERAL },
+            where: { type: PointSystemRuleType.GENERAL, transactionType },
             orderBy: { id: "desc" },
         }); // TODO: Use Caching here.
     }
-    async update(user: User, trx: ProcessedTransaction) {
-        const geenralRule = await this.getGeneralRule();
 
-        
+    calculatePoint(trx: ProcessedTransaction, rule: PointSystemRule) {
+        // TODO: Formula used here (esp. min and burn) is a test formula; It needs to be finalized.
+        switch (rule.transactionType) {
+            case TransactionType.SWAP:
+                const [inAmount, outAmount] =
+                    trx.token0Amount < 0
+                        ? [trx.token1Amount ?? 0, trx.token0Amount]
+                        : [trx.token0Amount, trx.token1Amount ?? 0];
+                const point =
+                    rule.baseValue + rule.relativeValue / inAmount / outAmount;
+                if (!isNaN(point)) {
+                    return point;
+                }
+            case TransactionType.MINT:
+            case TransactionType.BURN:
+                return (
+                    rule.baseValue +
+                    rule.relativeValue *
+                        (trx.token0Amount + (trx.token1Amount ?? 0))
+                );
+        }
+        return 0;
+    }
+    async update(user: User, trx: ProcessedTransaction) {
+        const generalRule = await this.getGeneralRule(trx.type);
+        if (generalRule) {
+            const point = this.calculatePoint(trx, generalRule);
+            await prisma.pointHistory.create({
+                data: {
+                    amount: point,
+                    ruleId: generalRule.id,
+                    userId: user.id,
+                    transactionId: trx.id,
+                },
+            });
+        }
     }
 }
