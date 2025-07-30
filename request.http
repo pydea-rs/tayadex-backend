@@ -1,0 +1,4 @@
+@host = http://localhost:8787
+
+GET {{host}}/api/user
+Content-Type: application/json

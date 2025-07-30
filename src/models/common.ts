@@ -9,5 +9,5 @@ export const PaginationSchema = z.object({
 export const PaginationWithOrderSchema = z.object({
   take: z.number().optional(),
   skip: z.number().optional(),
-  decending: z.boolean().optional(),
+  descending: z.boolean().optional(),
 });

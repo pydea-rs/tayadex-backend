@@ -24,7 +24,9 @@ export class GetUsersRoute extends OpenAPIRoute {
     };
 
     async handle(ctx: AppContext) {
-        const { take = null, skip = null } = (await ctx.req.json()) ?? {};
+        const {
+            query: { take = null, skip = null },
+        } = await this.getValidatedData<typeof this.schema>();
         return prisma.user.findMany({
             ...(skip ? { skip } : {}),
             ...(take ? { take } : {}),
@@ -128,12 +130,9 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
     async handle(ctx: AppContext) {
         const {
             params: { id },
+            query: { take = undefined, skip = undefined, descending = false },
         } = await this.getValidatedData<typeof this.schema>();
-        const {
-            take = undefined,
-            skip = undefined,
-            descending = false,
-        } = (await ctx.req.json()) ?? {};
+
         return PointService.get().getUserHistory(id, {
             take,
             skip,

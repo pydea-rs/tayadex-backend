@@ -46,10 +46,8 @@ export class GetPointHistoryRoute extends OpenAPIRoute {
 
     async handle(ctx: AppContext) {
         const {
-            take = undefined,
-            skip = undefined,
-            descending = false,
-        } = (await ctx.req.json()) ?? {};
+            query: { take = undefined, skip = undefined, descending = false },
+        } = await this.getValidatedData<typeof this.schema>();
         return PointService.get().getHistory({
             take,
             skip,
