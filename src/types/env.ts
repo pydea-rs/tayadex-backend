@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
 
 export interface IEnv {
-  CACHE: KVNamespace
+  // Add any environment variables you need here
+  PORT?: string;
+  DATABASE_URL?: string;
 }
 
 export type AppContext = Context<{ Bindings: IEnv }>
