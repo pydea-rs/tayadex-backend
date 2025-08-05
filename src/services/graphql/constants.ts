@@ -1,9 +1,12 @@
-import request, { type RequestDocument } from 'graphql-request'
+import request, { type RequestDocument } from "graphql-request";
 
 export async function tayaswapSubpgrah(query: RequestDocument, variables = {}) {
-  return await request('https://graph-monad.kindynos.mx/subgraphs/name/tayaswap-v2-subgraph', query, variables)
+    if (!process.env.GRAPHQL_ENDPOINT) {
+        throw new Error("GRAPHQL_ENDPOINT is not set");
+    }
+    return await request(process.env.GRAPHQL_ENDPOINT, query, variables);
 }
 
-export const POOLS_CACHE_KEY = 'pools'
+export const POOLS_CACHE_KEY = "pools";
 
-export const POOLS_CACHE = 300 // 5 minutes
+export const POOLS_CACHE = 300; // 5 minutes

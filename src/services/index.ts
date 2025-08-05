@@ -4,3 +4,4 @@ export * from "./point";
 export * from "./prisma";
 export * from "./referral";
 export * from "./cache";
+export * from "./blockchain";

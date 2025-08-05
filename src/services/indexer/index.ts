@@ -1,16 +1,12 @@
 import { Block, ProcessedTransaction, TransactionType } from "@prisma/client";
-import { tayaswapSubpgrah } from "../graphql/constants";
-import { GET_NEW_SWAPS, GET_NEW_LIQUIDITY } from "../graphql/queries";
 import { PointService } from "../point";
 import { prisma } from "../prisma";
-import {
-  INewLiquidityProvisionQueryResult,
-  INewSwapQueryResult,
-} from "../graphql";
+import { BlockchainService, type SwapEvent, type LiquidityEvent } from "../blockchain";
 import { evaluateTokenData, TokensNumericalData } from "@/utils";
 
 export class EventIndexer {
   private static singleInstance: EventIndexer;
+  private blockchainService!: BlockchainService;
 
   static get() {
     if (EventIndexer.singleInstance) {
@@ -23,6 +19,7 @@ export class EventIndexer {
     if (EventIndexer.singleInstance) {
       return EventIndexer.singleInstance; // Double check re-instanciation block.
     }
+    this.blockchainService = BlockchainService.getInstance();
   }
 
   async listen() {
@@ -46,127 +43,158 @@ export class EventIndexer {
   public async checkoutSwapEvents(lastBlock: Block | null) {
     console.log(`Indexing swaps from block ${lastBlock}`);
 
-    const latestBlockNumber = lastBlock?.number ?? 0n; // TODO: Decide what to do at indexer start? process from 0, or from latest block at present.
-    const { swaps } = (await tayaswapSubpgrah(GET_NEW_SWAPS, {
-      lastBlock: latestBlockNumber.toString(),
-    })) as INewSwapQueryResult;
-
-    for (const swap of swaps) {
+    const latestBlockNumber = lastBlock?.number ?? 0n;
+    const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
+    console.log(currentBlockNumber)
+    // Process blocks in batches to avoid overwhelming the RPC
+    const batchSize = BigInt(this.blockchainService["config"].batchSize);
+    let fromBlock = latestBlockNumber + 1n;
+    
+    while (fromBlock <= currentBlockNumber) {
+      const toBlock = fromBlock + batchSize - 1n > currentBlockNumber 
+        ? currentBlockNumber 
+        : fromBlock + batchSize - 1n;
+      
       try {
-        const block =
-          !lastBlock || lastBlock.number !== swap.blockNumber
-            ? await this.saveLastProcessedBlock(swap.blockNumber)
-            : lastBlock; // TODO: Do promise.all?
-        const { tx, alreadyProcessed } = await this.markTransactionProcessed(
-          swap.transaction.id, // TODO: id or hash?
-          TransactionType.SWAP,
-          block.id,
-          [
-            {
-              symbol: swap.pair.token0.symbol,
-              decimals: swap.pair.token0.decimals,
-              amount: swap.amount0In - swap.amount0Out,
-            },
-            {
-              symbol: swap.pair.token1.symbol,
-              decimals: swap.pair.token1.decimals,
-              amount: swap.amount1In - swap.amount1Out,
-            },
-          ],
-          swap.from,
-          swap.to
-        );
-        lastBlock = block;
+        const swaps = await this.blockchainService.getSwapEvents(fromBlock, toBlock);
+        console.log(swaps.length)
+        for (const swap of swaps) {
+          try {
+            const block =
+              !lastBlock || lastBlock.number !== swap.blockNumber
+                ? await this.saveLastProcessedBlock(swap.blockNumber)
+                : lastBlock;
+            
+            const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+              swap.transaction.id,
+              TransactionType.SWAP,
+              block.id,
+              [
+                {
+                  symbol: swap.pair.token0.symbol,
+                  decimals: swap.pair.token0.decimals,
+                  amount: swap.amount0In - swap.amount0Out,
+                },
+                {
+                  symbol: swap.pair.token1.symbol,
+                  decimals: swap.pair.token1.decimals,
+                  amount: swap.amount1In - swap.amount1Out,
+                },
+              ],
+              swap.from,
+              swap.to
+            );
+            lastBlock = block;
 
-        // TODO: Update point history...
-        if (!alreadyProcessed) {
-          await this.processNewSwapEvent(tx);
+            if (!alreadyProcessed) {
+              await this.processNewSwapEvent(tx);
+            }
+          } catch (error) {
+            console.error(`Error processing swap ${swap.id}:`, error);
+          }
         }
       } catch (error) {
-        console.error(`Error processing swap ${swap.id}:`, error);
+        console.error(`Error fetching swaps from blocks ${fromBlock}-${toBlock}:`, error);
       }
+      
+      fromBlock = toBlock + 1n;
     }
   }
 
   public async checkoutLiquidityEvents(lastBlock: Block | null) {
     console.log(`Indexing liquidity events from block ${lastBlock}`);
 
-    const latestBlockNumber = lastBlock?.number ?? 0n; // TODO: Decide what to do at indexer start? process from 0, or from latest block at present.
-
-    const { mints, burns } = (await tayaswapSubpgrah(GET_NEW_LIQUIDITY, {
-      lastBlock: latestBlockNumber.toString(),
-    })) as INewLiquidityProvisionQueryResult;
-
-    for (const mint of mints) {
+    const latestBlockNumber = lastBlock?.number ?? 0n;
+    const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
+    
+    // Process blocks in batches to avoid overwhelming the RPC
+    const batchSize = BigInt(this.blockchainService["config"].batchSize);
+    let fromBlock = latestBlockNumber + 1n;
+    
+    while (fromBlock <= currentBlockNumber) {
+      const toBlock = fromBlock + batchSize - 1n > currentBlockNumber 
+        ? currentBlockNumber 
+        : fromBlock + batchSize - 1n;
+      
       try {
-        const block =
-          !lastBlock || lastBlock.number !== mint.blockNumber
-            ? await this.saveLastProcessedBlock(mint.blockNumber)
-            : lastBlock;
+        const { mints, burns } = await this.blockchainService.getLiquidityEvents(fromBlock, toBlock);
 
-        const { tx, alreadyProcessed } = await this.markTransactionProcessed(
-          mint.transaction.id,
-          TransactionType.MINT,
-          block.id,
-          [
-            {
-              symbol: mint.pair.token0.symbol,
-              decimals: mint.pair.token0.decimals,
-              amount: mint.amount0,
-            },
-            {
-              symbol: mint.pair.token1.symbol,
-              decimals: mint.pair.token1.decimals,
-              amount: mint.amount1,
-            },
-          ],
-          mint.sender,
-          mint.to
-        );
+        for (const mint of mints) {
+          try {
+            const block =
+              !lastBlock || lastBlock.number !== mint.blockNumber
+                ? await this.saveLastProcessedBlock(mint.blockNumber)
+                : lastBlock;
 
-        lastBlock = block;
-        if (!alreadyProcessed) {
-          await this.processNewLiquidityEvent(tx);
+            const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+              mint.transaction.id,
+              TransactionType.MINT,
+              block.id,
+              [
+                {
+                  symbol: mint.pair.token0.symbol,
+                  decimals: mint.pair.token0.decimals,
+                  amount: mint.amount0,
+                },
+                {
+                  symbol: mint.pair.token1.symbol,
+                  decimals: mint.pair.token1.decimals,
+                  amount: mint.amount1,
+                },
+              ],
+              mint.sender,
+              mint.to
+            );
+
+            lastBlock = block;
+            if (!alreadyProcessed) {
+              await this.processNewLiquidityEvent(tx);
+            }
+          } catch (error) {
+            console.error(`Error processing mint ${mint.id}:`, error);
+          }
+        }
+
+        for (const burn of burns) {
+          try {
+            const block =
+              !lastBlock || lastBlock.number !== burn.blockNumber
+                ? await this.saveLastProcessedBlock(burn.blockNumber)
+                : lastBlock;
+
+            const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+              burn.transaction.id,
+              TransactionType.BURN,
+              block.id,
+              [
+                {
+                  symbol: burn.pair.token0.symbol,
+                  decimals: burn.pair.token0.decimals,
+                  amount: -burn.amount0, // Negative for burn events
+                },
+                {
+                  symbol: burn.pair.token1.symbol,
+                  decimals: burn.pair.token1.decimals,
+                  amount: -burn.amount1, // Negative for burn events
+                },
+              ],
+              burn.sender,
+              burn.to
+            );
+
+            lastBlock = block;
+            if (!alreadyProcessed) {
+              await this.processNewLiquidityEvent(tx);
+            }
+          } catch (error) {
+            console.error(`Error processing burn ${burn.id}:`, error);
+          }
         }
       } catch (error) {
-        console.error(`Error processing mint ${mint.id}:`, error);
+        console.error(`Error fetching liquidity events from blocks ${fromBlock}-${toBlock}:`, error);
       }
-    }
-
-    for (const burn of burns) {
-      try {
-        const block =
-          !lastBlock || lastBlock.number !== burn.blockNumber
-            ? await this.saveLastProcessedBlock(burn.blockNumber)
-            : lastBlock;
-
-        const { tx, alreadyProcessed } = await this.markTransactionProcessed(
-          burn.transaction.id,
-          TransactionType.BURN,
-          block.id,
-          [
-            {
-              symbol: burn.pair.token0.symbol,
-              decimals: burn.pair.token0.decimals,
-              amount: -burn.amount0, // TODO: Checkout the sign of the Burn events amount
-            },
-            {
-              symbol: burn.pair.token1.symbol,
-              decimals: burn.pair.token1.decimals,
-              amount: -burn.amount1, // TODO: Checkout the sign of the Burn events amount
-            },
-          ],
-          burn.sender,
-          burn.to
-        );
-
-        lastBlock = block;
-        if (!alreadyProcessed) {
-          await this.processNewLiquidityEvent(tx);
-        }
-      } catch (error) {
-        console.error(`Error processing burn ${burn.id}:`, error);
-      }
+      
+      fromBlock = toBlock + 1n;
     }
   }
 
