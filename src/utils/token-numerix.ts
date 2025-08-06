@@ -8,5 +8,5 @@ export type TokensNumericalData = {
 
 export const evaluateTokenData = (data: TokensNumericalData) => ({
   symbol: data.symbol,
-  amount: new Decimal(data.amount.toString()).div(data.decimals).toNumber(),
+  amount: new Decimal(data.amount.toString()).div(10 ** data.decimals).toNumber(),
 });

@@ -43,7 +43,7 @@ export class EventIndexer {
   public async checkoutSwapEvents(lastBlock: Block | null) {
     console.log(`Indexing swaps from block ${lastBlock}`);
 
-    const latestBlockNumber = lastBlock?.number ?? 0n;
+    const latestBlockNumber = lastBlock?.number ?? 5253609n;
     const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
     console.log(currentBlockNumber)
     // Process blocks in batches to avoid overwhelming the RPC
@@ -57,7 +57,7 @@ export class EventIndexer {
       
       try {
         const swaps = await this.blockchainService.getSwapEvents(fromBlock, toBlock);
-        console.log(swaps.length)
+
         for (const swap of swaps) {
           try {
             const block =
@@ -277,6 +277,7 @@ export class EventIndexer {
     });
 
     if (!tx) {
+      console.log(tokensData)
       const tokens = tokensData.map((tk) => evaluateTokenData(tk));
       tx = await prisma.processedTransaction.create({
         data: {
