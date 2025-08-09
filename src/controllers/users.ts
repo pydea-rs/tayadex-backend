@@ -1,9 +1,11 @@
 import { PointHistorySchema, UserSchema } from "@/models";
 import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
 import { prisma, PointService, ReferralService } from "@/services";
-import { AppContext } from "@/types";
+import { type AppContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
+import { isAddress } from "viem";
+import { UserService } from "@/services/user";
 
 export class GetUsersRoute extends OpenAPIRoute {
     schema = {
@@ -63,17 +65,14 @@ export class GetSingleUserRoute extends OpenAPIRoute {
                 where: { id: +ident },
             });
         }
-        const user = await prisma.user.findFirst({ where: { address: ident } });
-        if (!user) {
-            // TODO: check ident being valid address
-            return prisma.user.create({
-                data: {
-                    address: ident,
-                    referralCode: await ReferralService.get().generateNewCode(),
-                },
-            });
+
+        // Validate that ident is a valid address
+        if (!isAddress(ident)) {
+            throw new Error("Invalid address format");
         }
-        return user;
+
+        // Use UserService to handle case-insensitive address lookup and creation
+        return UserService.get().findOrCreateUserByAddress(ident);
     }
 }
 
@@ -133,10 +132,20 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
             query: { take = undefined, skip = undefined, descending = false },
         } = await this.getValidatedData<typeof this.schema>();
 
-        return PointService.get().getUserHistory(id, {
-            take,
-            skip,
-            orderDescending: descending,
-        });
+        return (
+            await PointService.get().getUserHistory(id, {
+                take,
+                skip,
+                orderDescending: descending,
+            })
+        ).map((point) => ({
+            ...point,
+            id: point.id.toString(),
+            transactionId: point.transactionId.toString(),
+            transaction: {
+                ...point.transaction,
+                id: point.transactionId.toString(),
+            },
+        }));
     }
 }

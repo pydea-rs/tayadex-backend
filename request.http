@@ -1,4 +1,4 @@
 @host = http://localhost:4200
 
-GET {{host}}/api/user
+GET {{host}}/api/point
 Content-Type: application/json

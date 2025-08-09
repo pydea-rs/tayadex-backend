@@ -59,8 +59,8 @@ export class PointService {
             case TransactionType.SWAP:
                 const [inAmount, outAmount] =
                     trx.token0Amount < 0
-                        ? [trx.token1Amount ?? 0, trx.token0Amount]
-                        : [trx.token0Amount, trx.token1Amount ?? 0];
+                        ? [trx.token1Amount ?? 0, -trx.token0Amount]
+                        : [trx.token0Amount, -(trx.token1Amount ?? 0)];
                 const point =
                     rule.baseValue + rule.relativeValue / inAmount / outAmount;
                 if (!isNaN(point)) {
@@ -124,7 +124,6 @@ export class PointService {
         userId?: number;
         orderDescending?: boolean;
     } = {}) {
-        // TODO: Checkout if Bigint cause problem in response
         return prisma.pointHistory.findMany({
             ...(userId != null ? { where: { userId } } : {}),
             ...(take != null ? { take } : {}),
@@ -156,9 +155,35 @@ export class PointService {
     }
 
     async getPointBoard() {
-        const results = await prisma.pointHistory.groupBy({
+        // Approach 1: Using raw query for better performance with user data
+        const results = await prisma.$queryRaw<{
+            userId: number;
+            totalPoints: number;
+            userName: string | null;
+            userAddress: string;
+            userCreatedAt: Date;
+        }[]>`
+            SELECT 
+                ph."user_id" as "userId",
+                SUM(ph.amount) as "totalPoints",
+                u.name as "userName",
+                u.address as "userAddress",
+                u.created_at as "userCreatedAt"
+            FROM "PointHistory" ph
+            LEFT JOIN "User" u ON ph."user_id" = u.id
+            WHERE ph."user_id" IS NOT NULL
+            GROUP BY ph."user_id", u.name, u.address, u.created_at
+            ORDER BY "totalPoints" DESC
+        `;
+        return results;
+    }
+
+    async getPointBoardWithDetails() {
+        // Approach 2: Using groupBy then fetching user details
+        const pointSums = await prisma.pointHistory.groupBy({
             by: ["userId"],
             _sum: { amount: true },
+            where: { userId: { not: null } },
             orderBy: {
                 _sum: {
                     amount: "desc",
@@ -166,10 +191,95 @@ export class PointService {
             },
         });
 
-        const userPoints = Object.fromEntries(
-            results.map((r) => [r.userId, r._sum.amount ?? 0])
-        );
-        return userPoints;
+        // Get user details for each userId
+        const userIds = pointSums.map(p => p.userId).filter(id => id !== null);
+        const users = await prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                createdAt: true,
+                // ...
+            }
+        });
+
+        const userMap = new Map(users.map(user => [user.id, user]));
+        return pointSums.map(pointSum => ({
+            userId: pointSum.userId,
+            totalPoints: pointSum._sum.amount ?? 0,
+            user: userMap.get(pointSum.userId!) ?? null,
+        }));
+    }
+
+    async getPointBoardWithHistory() {
+        // Approach 3: Get detailed point history with user and rule info
+        const results = await prisma.pointHistory.findMany({
+            where: { userId: { not: null } },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                        createdAt: true,
+                    }
+                },
+                rule: {
+                    select: {
+                        id: true,
+                        type: true,
+                        transactionType: true,
+                        baseValue: true,
+                        relativeValue: true,
+                    }
+                },
+                transaction: {
+                    select: {
+                        id: true,
+                        hash: true,
+                        type: true,
+                        token0: true,
+                        token1: true,
+                        createdAt: true,
+                    }
+                }
+            },
+            orderBy: { createdAt: "desc" }
+        });
+
+        // Group by user and calculate totals
+        const userPointsMap = new Map<number, {
+            user: any;
+            totalPoints: number;
+            pointEntries: any[];
+        }>();
+
+        results.forEach(entry => {
+            if (!entry.userId) return;
+            
+            if (!userPointsMap.has(entry.userId)) {
+                userPointsMap.set(entry.userId, {
+                    user: entry.user,
+                    totalPoints: 0,
+                    pointEntries: []
+                });
+            }
+            
+            const userData = userPointsMap.get(entry.userId)!;
+            userData.totalPoints += entry.amount;
+            userData.pointEntries.push({
+                id: entry.id,
+                amount: entry.amount,
+                createdAt: entry.createdAt,
+                rule: entry.rule,
+                transaction: entry.transaction,
+            });
+        });
+
+        // Convert to array and sort by total points
+        return Array.from(userPointsMap.values())
+            .sort((a, b) => b.totalPoints - a.totalPoints);
     }
 
     async getOnesPoint(userId: number) {

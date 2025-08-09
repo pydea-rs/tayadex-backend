@@ -48,10 +48,20 @@ export class GetPointHistoryRoute extends OpenAPIRoute {
         const {
             query: { take = undefined, skip = undefined, descending = false },
         } = await this.getValidatedData<typeof this.schema>();
-        return PointService.get().getHistory({
-            take,
-            skip,
-            orderDescending: descending,
-        });
+        return (
+            await PointService.get().getHistory({
+                take,
+                skip,
+                orderDescending: descending,
+            })
+        ).map((point) => ({
+            ...point,
+            id: point.id.toString(),
+            transactionId: point.transactionId.toString(),
+            transaction: {
+                ...point.transaction,
+                id: point.transactionId.toString(),
+            },
+        }));
     }
 }

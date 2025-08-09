@@ -54,8 +54,8 @@ model ProcessedTransaction {
   to           String
   token0       String
   token1       String?
-  token0Amount Int             @map("token0_amount")
-  token1Amount Int?            @map("token1_amount")
+  token0Amount Float             @map("token0_amount")
+  token1Amount Float?            @map("token1_amount")
   type         TransactionType @default(SWAP)
   createdAt    DateTime        @default(now()) @map("created_at")
   processedAt  DateTime?       @map("processed_at")

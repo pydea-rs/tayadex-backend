@@ -263,6 +263,11 @@ export class BlockchainService {
     return await this.withRetry(() => this.client.getBlock({ blockNumber }))
   }
 
+  async getTransactionOrigin(txHash: string): Promise<string> {
+    const transaction = await this.client.getTransaction({ hash: txHash as `0x${string}` })
+    return transaction.from;
+  }
+
   getLogs(fromBlock: bigint, toBlock: bigint, address?: Address) {
     return this.withRetry(() => this.client.getLogs({
       fromBlock,

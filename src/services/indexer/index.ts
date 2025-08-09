@@ -3,6 +3,7 @@ import { PointService } from "../point";
 import { prisma } from "../prisma";
 import { BlockchainService, type SwapEvent, type LiquidityEvent } from "../blockchain";
 import { evaluateTokenData, TokensNumericalData } from "@/utils";
+import { UserService } from "../user";
 
 export class EventIndexer {
   private static singleInstance: EventIndexer;
@@ -31,10 +32,9 @@ export class EventIndexer {
         }`
       );
 
-      await Promise.all([
-        this.checkoutSwapEvents(lastBlock),
-        this.checkoutLiquidityEvents(lastBlock),
-      ]);
+      await this.checkoutSwapEvents(lastBlock);
+      await this.checkoutLiquidityEvents(lastBlock);
+
     } catch (error) {
       console.error("Listener failed on this round:", error);
     }
@@ -203,8 +203,7 @@ export class EventIndexer {
       where: { address: { equals: tx.from, mode: "insensitive" } },
     });
     if (!user) {
-      return; // Only registered user will be rewarded
-      // TODO/ASK: What if user registers later?
+      return;
     }
     // Award points for swap based on specified rule:
     await Promise.all([
@@ -242,15 +241,22 @@ export class EventIndexer {
   public async saveLastProcessedBlock(
     blockNumber: number | bigint
   ): Promise<Block> {
-    const block = await prisma.block.findFirst({
-      where: { number: blockNumber },
-    });
-    if (block) {
-      return block;
+    try {
+      // Try to create the block directly
+      return await prisma.block.create({
+        data: { number: BigInt(blockNumber) },
+      });
+    } catch (error) {
+      const existingBlock = await prisma.block.findFirst({
+        where: { number: blockNumber },
+      });
+      
+      if (!existingBlock) {
+        throw error;
+      }
+      
+      return existingBlock;
     }
-    return prisma.block.create({
-      data: { number: BigInt(blockNumber) },
-    });
   }
 
   public async isTransactionProcessed(
@@ -277,20 +283,22 @@ export class EventIndexer {
     });
 
     if (!tx) {
-      console.log(tokensData)
+      const performerAddress = await this.blockchainService.getTransactionOrigin(txHash);
+      const user = await UserService.get().findOrCreateUserByAddress(performerAddress);
       const tokens = tokensData.map((tk) => evaluateTokenData(tk));
       tx = await prisma.processedTransaction.create({
         data: {
           hash: txHash,
           type: eventType as TransactionType,
           blockId,
-          from,
+          from: performerAddress,
           to,
           token0: tokens[0].symbol,
           token0Amount: tokens[0].amount,
           token1: tokens[1].symbol,
           token1Amount: tokens[1].amount,
           processedAt: new Date(),
+          userId: user?.id,
         },
       });
     } else {
