@@ -4,9 +4,8 @@ import { prisma, PointService, ReferralService } from "@/services";
 import { type AppContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
-import { isAddress } from "viem";
 import { UserService } from "@/services/user";
-import { authMiddleware, type AuthContext } from '@/middleware/auth';
+import { authMiddleware, type AuthContext } from "@/middleware/auth";
 
 export class GetUsersRoute extends OpenAPIRoute {
     schema = {
@@ -38,6 +37,8 @@ export class GetUsersRoute extends OpenAPIRoute {
 }
 
 export class GetSingleUserRoute extends OpenAPIRoute {
+    private userService = UserService.get();
+
     schema = {
         request: {
             params: z.object({
@@ -61,23 +62,22 @@ export class GetSingleUserRoute extends OpenAPIRoute {
             params: { ident },
         } = await this.getValidatedData<typeof this.schema>();
 
-        if (!isNaN(+ident)) {
-            return prisma.user.findFirstOrThrow({
-                where: { id: +ident },
+        try {
+
+            return this.userService.getProfile(ident, {
+                publicDataOnly: true,
+                throwIfNotFound: true,
             });
+        } catch(ex) {
+            return ctx.json({ error: (ex as Error).message }, 400);
         }
 
-        // Validate that ident is a valid address
-        if (!isAddress(ident)) {
-            throw new Error("Invalid address format");
-        }
-
-        // Use UserService to handle case-insensitive address lookup and creation
-        return UserService.get().findOrCreateUserByAddress(ident);
     }
 }
 
 export class GetUserPointRoute extends OpenAPIRoute {
+    private pointService = PointService.get();
+
     schema = {
         request: {
             params: z.object({
@@ -110,7 +110,7 @@ export class GetUserPointRoute extends OpenAPIRoute {
     async handle(ctx: AuthContext) {
         // Apply authentication middleware
         await authMiddleware(ctx, async () => {});
-        
+
         const {
             params: { id },
         } = await this.getValidatedData<typeof this.schema>();
@@ -121,11 +121,13 @@ export class GetUserPointRoute extends OpenAPIRoute {
             // In production, you might want to restrict this
         }
 
-        return PointService.get().getOnesPoint(id);
+        return this.pointService.getOnesPoint(id);
     }
 }
 
 export class GetUserPointHistoryRoute extends OpenAPIRoute {
+    private pointService = PointService.get();
+
     schema = {
         request: {
             params: z.object({
@@ -153,7 +155,7 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
         } = await this.getValidatedData<typeof this.schema>();
 
         return (
-            await PointService.get().getUserHistory(id, {
+            await this.pointService.getUserHistory(id, {
                 take,
                 skip,
                 orderDescending: descending,
@@ -167,5 +169,43 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
                 id: point.transactionId.toString(),
             },
         }));
+    }
+}
+
+export class GetProfileRoute extends OpenAPIRoute {
+    schema = {
+        responses: {
+            200: {
+                description: "Get authenticated user profile",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            id: z.number(),
+                            address: z.string(),
+                            name: z.string().nullable(),
+                            email: z.string().nullable(),
+                            referralCode: z.string(),
+                            createdAt: z.date(),
+                        }),
+                    },
+                },
+            },
+            401: {
+                description: "Unauthorized - Authentication required",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            error: z.string(),
+                        }),
+                    },
+                },
+            },
+        },
+    };
+
+    async handle(ctx: AuthContext) {
+        const user = { ...ctx.user };
+        delete user.updatedAt;
+        return user;
     }
 }

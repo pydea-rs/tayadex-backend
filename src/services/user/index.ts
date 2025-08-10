@@ -1,9 +1,10 @@
 import { prisma } from "../prisma";
 import { ReferralService } from "../referral";
-import { getAddress } from "viem";
+import { Address, getAddress, isAddress } from "viem";
 
 export class UserService {
     private static singleInstance: UserService;
+    private readonly referralService = ReferralService.get();
 
     public static get() {
         if (UserService.singleInstance) {
@@ -18,69 +19,67 @@ export class UserService {
         }
     }
 
-    // async findOrCreateUserByAddress(address: string) {
-    //     // Normalize the address to checksum format to ensure consistency
-    //     const normalizedAddress = getAddress(address);
+    async getProfile(
+        ident: string,
+        {
+            publicDataOnly = false,
+            throwIfNotFound = true,
+        }: { publicDataOnly?: boolean; throwIfNotFound?: boolean } = {}
+    ) {
+        const isWalletAddress = isAddress(ident);
+        if (isNaN(+ident) && !isWalletAddress) {
+            throw new Error("Invalid user Id or wallet address!");
+        }
+        const user = await prisma.user.findUnique({
+            where: isWalletAddress ? { address: ident } : { id: +ident },
+            select: {
+                id: true,
+                address: true,
+                name: true,
+                ...(!publicDataOnly ? { email: true, referralCode: true } : {}),
+                createdAt: true,
+            },
+        });
 
-    //     // Use a transaction to handle potential race conditions
-    //     return await prisma.$transaction(async (tx) => {
-    //         // First try to find existing user with case-insensitive search
-    //         const user = await tx.user.findFirst({
-    //             where: { address: { equals: normalizedAddress, mode: "insensitive" } },
-    //         });
+        if (!user && throwIfNotFound) {
+            throw new Error("User not found!");
+        }
+        return user;
+    }
 
-    //         if (user) {
-    //             return user;
-    //         }
+    findOne(id: number, include: Record<string, boolean>) {
+        return prisma.user.findUnique({
+            where: { id },
+            ...(Object.keys(include ?? {})?.length ? { include } : {}),
+        });
+    }
 
-    //         // If no user found, try to create with normalized address
-    //         try {
-    //             return await tx.user.create({
-    //                 data: {
-    //                     address: normalizedAddress,
-    //                     referralCode: await ReferralService.get().generateNewCode(),
-    //                 },
-    //             });
-    //         } catch (error) {
-    //             // If creation fails due to unique constraint, try finding again
-    //             // This handles race conditions where another process created the user
-    //             if (error instanceof Error && 'code' in error && error.code === 'P2002' &&
-    //                 'meta' in error && typeof error.meta === 'object' && error.meta !== null &&
-    //                 'target' in error.meta && Array.isArray(error.meta.target) &&
-    //                 error.meta.target.includes('address')) {
-    //                 const existingUser = await tx.user.findFirst({
-    //                     where: { address: { equals: normalizedAddress, mode: "insensitive" } },
-    //                 });
-    //                 if (existingUser) {
-    //                     return existingUser;
-    //                 }
-    //             }
-    //             throw error;
-    //         }
-    //     });
-    // }
-    async findOrCreateUserByAddress(address: string) {
+    async findOrCreateUserByAddress(
+        address: string,
+        possibleCreationData: { email?: string; name?: string } = {}
+    ) {
         // Normalize the address to checksum format
         const normalizedAddress = getAddress(address);
-        
+
         try {
-            return await prisma.user.create({
+            return prisma.user.create({
                 data: {
                     address: normalizedAddress,
-                    referralCode: await ReferralService.get().generateNewCode(),
+                    referralCode: await this.referralService.generateNewCode(),
+                    ...possibleCreationData,
                 },
             });
         } catch (ex) {
             // If creation fails due to unique constraint, find the existing user
             const existingUser = await prisma.user.findFirst({
-                where: { address: { equals: normalizedAddress, mode: "insensitive" } },
+                where: {
+                    address: { equals: normalizedAddress, mode: "insensitive" },
+                },
             });
-            
+
             if (!existingUser) {
-                // This shouldn't happen, but if it does, throw the original error
                 throw ex;
             }
-            
             return existingUser;
         }
     }

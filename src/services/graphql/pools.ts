@@ -2,7 +2,7 @@ import type { AppContext } from "@/types";
 import { GET_POOLS_QUERY } from "./queries";
 import { POOLS_CACHE, POOLS_CACHE_KEY, tayaswapSubpgrah } from "./constants";
 import { IPairTokenData } from "./common";
-import { cacheService } from "../cache";
+import { CacheService } from "../cache";
 
 interface IPoolsResponse {
   pairs: IPairTokenData[];
@@ -18,12 +18,12 @@ async function fetchPools() {
 }
 
 export async function getPools(context: AppContext): Promise<IPairTokenData[]> {
-  const cachedPools = await cacheService.get(POOLS_CACHE_KEY);
+  const cachedPools = CacheService.getInstance().get(POOLS_CACHE_KEY);
 
   const pools = cachedPools ? JSON.parse(cachedPools) : await fetchPools();
 
   if (!cachedPools) {
-    await cacheService.put(POOLS_CACHE_KEY, JSON.stringify(pools), {
+    CacheService.getInstance().put(POOLS_CACHE_KEY, JSON.stringify(pools), {
       expirationTtl: POOLS_CACHE,
     });
   }
