@@ -12,11 +12,13 @@
   "dependencies": {
     "@hono/node-server": "^1.8.2",
     "@prisma/client": "^6.8.2",
+    "@types/jsonwebtoken": "^9.0.10",
     "chanfana": "2.6.3",
     "decimal.js": "^10.5.0",
     "ethers": "^6.15.0",
     "graphql-request": "7.1.2",
     "hono": "4.7.4",
+    "jsonwebtoken": "^9.0.2",
     "node-cron": "^4.1.0",
     "prisma": "^6.8.2",
     "tsx": "^4.19.2",

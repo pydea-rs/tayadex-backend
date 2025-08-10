@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 
-export interface IEnv {
-  // Add any environment variables you need here
+export interface Env {
   PORT?: string;
-  DATABASE_URL?: string;
+  DATABASE_URL: string;
+  JWT_SECRET?: string;
+  NODE_ENV?: string;
 }
 
-export type AppContext = Context<{ Bindings: IEnv }>
+export type AppContext = Context<{ Bindings: Env }>

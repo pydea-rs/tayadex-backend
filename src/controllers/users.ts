@@ -6,6 +6,7 @@ import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { isAddress } from "viem";
 import { UserService } from "@/services/user";
+import { authMiddleware, type AuthContext } from '@/middleware/auth';
 
 export class GetUsersRoute extends OpenAPIRoute {
     schema = {
@@ -93,13 +94,32 @@ export class GetUserPointRoute extends OpenAPIRoute {
                     },
                 },
             },
+            401: {
+                description: "Unauthorized - Authentication required",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            error: z.string(),
+                        }),
+                    },
+                },
+            },
         },
     };
 
-    async handle(ctx: AppContext) {
+    async handle(ctx: AuthContext) {
+        // Apply authentication middleware
+        await authMiddleware(ctx, async () => {});
+        
         const {
             params: { id },
         } = await this.getValidatedData<typeof this.schema>();
+
+        // Optional: Check if user is requesting their own points or has admin access
+        if (ctx.user && ctx.user.id !== id) {
+            // For now, allow access to any user's points
+            // In production, you might want to restrict this
+        }
 
         return PointService.get().getOnesPoint(id);
     }
