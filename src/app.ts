@@ -8,20 +8,20 @@ import {
     GetUserPointRoute,
     GetUsersRoute,
     GetProfileRoute,
+    PatchUserRoute,
 } from "@/controllers";
 import { GetNonceRoute, Web3LoginRoute } from "@/controllers/auth";
 import { app, AuthGuard, openapi } from "./utils/setup";
 
-// Authentication routes
 openapi.get("/api/auth/nonce", GetNonceRoute);
 openapi.post("/api/auth/login", Web3LoginRoute);
 
-// Existing routes
 openapi.get("/api/tasks/:id", GetTaskVerify);
 openapi.get("/api/quote", GetQuote);
 
 AuthGuard.get("/api/user/profile", GetProfileRoute);
 openapi.get("api/user", GetUsersRoute);
+AuthGuard.patch("/api/user/profile", PatchUserRoute);
 openapi.get("api/user/:id/point", GetUserPointRoute);
 openapi.get("api/user/:id/point/history", GetUserPointHistoryRoute);
 openapi.get("api/user/:ident", GetSingleUserRoute);

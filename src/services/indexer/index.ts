@@ -1,4 +1,4 @@
-import { Block, ProcessedTransaction, TransactionType } from "@prisma/client";
+import { Block, ProcessedTransaction, TransactionType, User } from "@prisma/client";
 import { PointService } from "../point";
 import { prisma } from "../prisma";
 import { BlockchainService, type SwapEvent, type LiquidityEvent } from "../blockchain";
@@ -7,20 +7,20 @@ import { UserService } from "../user";
 
 export class EventIndexer {
   private static singleInstance: EventIndexer;
-  private blockchainService!: BlockchainService;
-
+  private blockchainService: BlockchainService = BlockchainService.getInstance();;
+  private readonly pointService = PointService.get();
+  private readonly userService = UserService.get();
   static get() {
     if (EventIndexer.singleInstance) {
       return EventIndexer.singleInstance;
     }
-    return new EventIndexer(PointService.get());
+    return new EventIndexer();
   }
 
-  private constructor(private readonly pointService: PointService) {
+  private constructor() {
     if (EventIndexer.singleInstance) {
       return EventIndexer.singleInstance; // Double check re-instanciation block.
     }
-    this.blockchainService = BlockchainService.getInstance();
   }
 
   async listen() {
@@ -65,7 +65,7 @@ export class EventIndexer {
                 ? await this.saveLastProcessedBlock(swap.blockNumber)
                 : lastBlock;
             
-            const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+            const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
               swap.transaction.id,
               TransactionType.SWAP,
               block.id,
@@ -81,13 +81,12 @@ export class EventIndexer {
                   amount: swap.amount1In - swap.amount1Out,
                 },
               ],
-              swap.from,
               swap.to
             );
             lastBlock = block;
 
             if (!alreadyProcessed) {
-              await this.processNewSwapEvent(tx);
+              await this.processNewSwapEvent(tx, user);
             }
           } catch (error) {
             console.error(`Error processing swap ${swap.id}:`, error);
@@ -126,7 +125,7 @@ export class EventIndexer {
                 ? await this.saveLastProcessedBlock(mint.blockNumber)
                 : lastBlock;
 
-            const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+            const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
               mint.transaction.id,
               TransactionType.MINT,
               block.id,
@@ -142,13 +141,12 @@ export class EventIndexer {
                   amount: mint.amount1,
                 },
               ],
-              mint.sender,
               mint.to
             );
 
             lastBlock = block;
             if (!alreadyProcessed) {
-              await this.processNewLiquidityEvent(tx);
+              await this.processNewLiquidityEvent(tx, user);
             }
           } catch (error) {
             console.error(`Error processing mint ${mint.id}:`, error);
@@ -162,7 +160,7 @@ export class EventIndexer {
                 ? await this.saveLastProcessedBlock(burn.blockNumber)
                 : lastBlock;
 
-            const { tx, alreadyProcessed } = await this.markTransactionProcessed(
+            const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
               burn.transaction.id,
               TransactionType.BURN,
               block.id,
@@ -178,13 +176,12 @@ export class EventIndexer {
                   amount: -burn.amount1, // Negative for burn events
                 },
               ],
-              burn.sender,
               burn.to
             );
 
             lastBlock = block;
             if (!alreadyProcessed) {
-              await this.processNewLiquidityEvent(tx);
+              await this.processNewLiquidityEvent(tx, user);
             }
           } catch (error) {
             console.error(`Error processing burn ${burn.id}:`, error);
@@ -198,27 +195,21 @@ export class EventIndexer {
     }
   }
 
-  public async processNewSwapEvent(tx: ProcessedTransaction) {
-    const user = await prisma.user.findFirst({
-      where: { address: { equals: tx.from, mode: "insensitive" } },
-    });
+  public async processNewSwapEvent(tx: ProcessedTransaction, user?: User | null) {
     if (!user) {
       return;
     }
-    // Award points for swap based on specified rule:
+
     await Promise.all([
       this.pointService.update(user, tx),
       prisma.processedTransaction.update({
         data: { userId: user.id },
         where: { id: tx.id },
-      }), // We save all transactions, but only reward transactions that relate to user table.
+      }),
     ]);
   }
 
-  public async processNewLiquidityEvent(tx: ProcessedTransaction) {
-    const user = await prisma.user.findFirst({
-      where: { address: { equals: tx.from, mode: "insensitive" } },
-    });
+  public async processNewLiquidityEvent(tx: ProcessedTransaction, user?: User | null) {
     if (!user) {
       return;
     }
@@ -275,18 +266,18 @@ export class EventIndexer {
     eventType: string | TransactionType,
     blockId: number,
     tokensData: TokensNumericalData[],
-    from: string,
     to: string
   ) {
-    let tx = await prisma.processedTransaction.findFirst({
+    const tx = await prisma.processedTransaction.findFirst({
       where: { hash: txHash, type: eventType as TransactionType },
+      include: { user: true }
     });
 
     if (!tx) {
       const performerAddress = await this.blockchainService.getTransactionOrigin(txHash);
-      const user = await UserService.get().findOrCreateUserByAddress(performerAddress);
+      const { user } = await this.userService.findOrCreateUserByAddress(performerAddress);
       const tokens = tokensData.map((tk) => evaluateTokenData(tk));
-      tx = await prisma.processedTransaction.create({
+      const newTx = await prisma.processedTransaction.create({
         data: {
           hash: txHash,
           type: eventType as TransactionType,
@@ -301,22 +292,25 @@ export class EventIndexer {
           userId: user?.id,
         },
       });
-    } else {
-      if (tx.processedAt) {
-        return { tx, alreadyProcessed: true };
-      }
-      const tokens = tokensData.map((tk) => evaluateTokenData(tk));
-      tx.processedAt = new Date();
-      // make sure token data is synced.
-      tx.token0 = tokens[0].symbol;
-      tx.token0Amount = tokens[0].amount;
-      tx.token1 = tokens[1].symbol;
-      tx.token1Amount = tokens[1].amount;
-      await prisma.processedTransaction.update({
-        data: tx,
-        where: { id: tx.id },
-      });
+      return { tx: newTx, user, alreadyProcessed: false };
+    } 
+
+    if (tx.processedAt) {
+      return { tx, user: tx.user, alreadyProcessed: true };
     }
-    return { tx, alreadyProcessed: false };
+    const { user, ...processedTx } = tx;
+    const tokens = tokensData.map((tk) => evaluateTokenData(tk));
+    processedTx.processedAt = new Date();
+    // make sure token data is synced.
+    processedTx.token0 = tokens[0].symbol;
+    processedTx.token0Amount = tokens[0].amount;
+    processedTx.token1 = tokens[1].symbol;
+    processedTx.token1Amount = tokens[1].amount;
+    await prisma.processedTransaction.update({
+      data: processedTx,
+      where: { id: tx.id },
+    });
+
+    return { tx, user, alreadyProcessed: false };
   }
 }

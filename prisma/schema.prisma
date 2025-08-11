@@ -14,12 +14,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Avatar {
+  id             Int      @id @default(autoincrement())
+  asset          String
+  createdAt      DateTime @default(now()) @map("created_at")
+  usersUsingThis User[]
+}
+
 model User {
   id           Int                    @id @default(autoincrement())
   name         String?
   email        String?                @unique
   address      String                 @unique
   referralCode String                 @unique
+  avatarId     Int?                   @map("avatar_id")
+  avatar       Avatar?                @relation(fields: [avatarId], references: [id])
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
   transactions ProcessedTransaction[]
@@ -54,8 +63,8 @@ model ProcessedTransaction {
   to           String
   token0       String
   token1       String?
-  token0Amount Float             @map("token0_amount")
-  token1Amount Float?            @map("token1_amount")
+  token0Amount Float           @map("token0_amount")
+  token1Amount Float?          @map("token1_amount")
   type         TransactionType @default(SWAP)
   createdAt    DateTime        @default(now()) @map("created_at")
   processedAt  DateTime?       @map("processed_at")

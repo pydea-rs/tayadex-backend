@@ -1,13 +1,19 @@
 import { PointHistorySchema, UserSchema } from "@/models";
 import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
-import { prisma, PointService, ReferralService } from "@/services";
-import { type AppContext } from "@/types";
+import { PointService, ReferralService } from "@/services";
+import {
+    UserPrivateProfileDto,
+    UserPublicProfileDto,
+    type AppContext,
+} from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { UserService } from "@/services/user";
-import { authMiddleware, type AuthContext } from "@/middleware/auth";
+import { type AuthContext } from "@/middleware/auth";
 
 export class GetUsersRoute extends OpenAPIRoute {
+    private userService = UserService.get();
+
     schema = {
         request: {
             query: PaginationSchema,
@@ -17,22 +23,18 @@ export class GetUsersRoute extends OpenAPIRoute {
                 description: "Get users endpoint",
                 content: {
                     "application/json": {
-                        schema: z.array(UserSchema),
+                        schema: z.array(UserPublicProfileDto),
                     },
                 },
-                // TODO: Add auth after completing referral
             },
         },
     };
 
     async handle(ctx: AppContext) {
         const {
-            query: { take = null, skip = null },
+            query: { take = undefined, skip = undefined },
         } = await this.getValidatedData<typeof this.schema>();
-        return prisma.user.findMany({
-            ...(skip ? { skip } : {}),
-            ...(take ? { take } : {}),
-        });
+        return this.userService.findMany({ take, skip, publicDataOnly: true });
     }
 }
 
@@ -63,15 +65,13 @@ export class GetSingleUserRoute extends OpenAPIRoute {
         } = await this.getValidatedData<typeof this.schema>();
 
         try {
-
             return this.userService.getProfile(ident, {
                 publicDataOnly: true,
                 throwIfNotFound: true,
             });
-        } catch(ex) {
+        } catch (ex) {
             return ctx.json({ error: (ex as Error).message }, 400);
         }
-
     }
 }
 
@@ -107,19 +107,10 @@ export class GetUserPointRoute extends OpenAPIRoute {
         },
     };
 
-    async handle(ctx: AuthContext) {
-        // Apply authentication middleware
-        await authMiddleware(ctx, async () => {});
-
+    async handle(ctx: AppContext) {
         const {
             params: { id },
         } = await this.getValidatedData<typeof this.schema>();
-
-        // Optional: Check if user is requesting their own points or has admin access
-        if (ctx.user && ctx.user.id !== id) {
-            // For now, allow access to any user's points
-            // In production, you might want to restrict this
-        }
 
         return this.pointService.getOnesPoint(id);
     }
@@ -179,14 +170,7 @@ export class GetProfileRoute extends OpenAPIRoute {
                 description: "Get authenticated user profile",
                 content: {
                     "application/json": {
-                        schema: z.object({
-                            id: z.number(),
-                            address: z.string(),
-                            name: z.string().nullable(),
-                            email: z.string().nullable(),
-                            referralCode: z.string(),
-                            createdAt: z.date(),
-                        }),
+                        schema: UserPrivateProfileDto,
                     },
                 },
             },
@@ -207,5 +191,103 @@ export class GetProfileRoute extends OpenAPIRoute {
         const user = { ...ctx.user };
         delete user.updatedAt;
         return user;
+    }
+}
+
+export class PatchUserRoute extends OpenAPIRoute {
+    private readonly userService = UserService.get();
+    private readonly referralService = ReferralService.get();
+
+    schema = {
+        request: {
+            body: {
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            email: z.string().email().nullable(),
+                            name: z.string().nullable(),
+                            referralCode: z.string().nullable(),
+                        }),
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: "User update was successful.",
+                content: {
+                    "application/json": {
+                        schema: UserPrivateProfileDto,
+                    },
+                },
+            },
+            400: {
+                description: "Invalid update data",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            error: z.string(),
+                        }),
+                    },
+                },
+            },
+            401: {
+                description: "Authentication failed",
+                content: {
+                    "application/json": {
+                        schema: z.object({
+                            error: z.string(),
+                        }),
+                    },
+                },
+            },
+        },
+    };
+
+    async handle(ctx: AuthContext) {
+        const {
+            body: { email = null, name = null, referralCode = null },
+        } = await this.getValidatedData<typeof this.schema>();
+
+        const { user } = ctx;
+        
+        try {
+            if(!user) {
+                return ctx.json({ error: "Authentication failed." }, 401)
+            }
+            if (
+                (!email?.length ||
+                    email.toLowerCase() === user?.email?.toLowerCase()) &&
+                (!name?.length || name === user?.name) &&
+                !referralCode?.length
+            ) {
+                throw new Error("Nothing new provided to update!");
+            }
+
+            if (referralCode?.length) {
+                await this.referralService.validateUserAllowanceToSetReferrerCode(
+                    user,
+                    true
+                );
+                await this.referralService.linkUserToReferrers(
+                    user,
+                    referralCode,
+                    true,
+                );
+            }
+            
+            if(email?.length) {
+                user.email = email.trim().toLowerCase();
+            }
+            
+            if(name?.length) {
+                user.name = name;
+            }
+            
+            await this.userService.updateUser(user);
+            return user;
+        } catch (ex) {
+            return ctx.json({ error: (ex as Error).message }, 400);
+        }
     }
 }

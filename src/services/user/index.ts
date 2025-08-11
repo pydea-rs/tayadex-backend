@@ -1,3 +1,4 @@
+import { User } from "@prisma/client";
 import { prisma } from "../prisma";
 import { ReferralService } from "../referral";
 import { Address, getAddress, isAddress } from "viem";
@@ -36,6 +37,7 @@ export class UserService {
                 id: true,
                 address: true,
                 name: true,
+                avatar: true,
                 ...(!publicDataOnly ? { email: true, referralCode: true } : {}),
                 createdAt: true,
             },
@@ -54,33 +56,76 @@ export class UserService {
         });
     }
 
+    findMany({
+        take = undefined,
+        skip = undefined,
+        publicDataOnly = true,
+    }: {
+        take?: number;
+        skip?: number;
+        publicDataOnly?: boolean;
+    }) {
+        return prisma.user.findMany({
+            ...(publicDataOnly
+                ? {
+                      select: {
+                          id: true,
+                          address: true,
+                          name: true,
+                          avatar: true,
+                          createdAt: true,
+                      },
+                  }
+                : {}),
+            ...(skip ? { skip } : {}),
+            ...(take ? { take } : {}),
+        });
+    }
+
+    async getRandomAvatar() {
+        const avatars = await prisma.avatar.findMany();
+        if (!avatars.length) {
+            return null;
+        }
+        return avatars[(Math.random() * avatars.length) | 0];
+    }
+
+    updateUser(user: User) {
+        return prisma.user.update({ where: { id: user.id }, data: user });
+    }
+
     async findOrCreateUserByAddress(
         address: string,
         possibleCreationData: { email?: string; name?: string } = {}
     ) {
-        // Normalize the address to checksum format
         const normalizedAddress = getAddress(address);
-
         try {
-            return prisma.user.create({
-                data: {
-                    address: normalizedAddress,
-                    referralCode: await this.referralService.generateNewCode(),
-                    ...possibleCreationData,
-                },
-            });
+            const [referralCode, avatar] = await Promise.all([
+                this.referralService.generateNewCode(),
+                this.getRandomAvatar(),
+            ]);
+            return {
+                created: true,
+                user: await prisma.user.create({
+                    data: {
+                        address: normalizedAddress,
+                        referralCode,
+                        ...(avatar ? { avatarId: avatar.id } : {}),
+                        ...possibleCreationData,
+                    },
+                }),
+            };
         } catch (ex) {
             // If creation fails due to unique constraint, find the existing user
-            const existingUser = await prisma.user.findFirst({
+            const user = await prisma.user.findFirst({
                 where: {
                     address: { equals: normalizedAddress, mode: "insensitive" },
                 },
             });
-
-            if (!existingUser) {
-                throw ex;
+            if (!user) {
+                throw new Error("User not found!");
             }
-            return existingUser;
+            return { user, created: false };
         }
     }
 }

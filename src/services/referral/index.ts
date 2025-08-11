@@ -16,7 +16,7 @@ export class ReferralService {
             ReferralService.singleInstance;
         }
     }
-    async findUserByReferralCode(code: string, loadUser = true) {
+    async findUserByReferralCode(code: string) {
         return prisma.user.findFirst({
             where: { referralCode: code },
         });
@@ -28,7 +28,7 @@ export class ReferralService {
     ) {
         if (checkDate) {
             // In case this is called from some endpoint other than register!
-            const deadlineInMinutes = 60; // TODO: Use configService.
+            const deadlineInMinutes = 10; // TODO: Use configService.
 
             if (
                 Date.now() - new Date(user.createdAt).getTime() >=
@@ -166,7 +166,7 @@ export class ReferralService {
             for (let i = code.length; i < codeLength; i++) {
                 code += characters[(Math.random() * characters.length) | 0];
             }
-        } while (await this.findUserByReferralCode(code, false));
+        } while (await this.findUserByReferralCode(code));
         return code;
     }
 

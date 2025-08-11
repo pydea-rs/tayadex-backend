@@ -9,8 +9,9 @@ import {
     Web3AuthSchema,
 } from "@/utils/auth";
 import { type AppContext } from "@/types";
-import { CacheService } from "@/services";
+import { CacheService, ReferralService } from "@/services";
 import { UserService } from "@/services/user";
+import { error } from "console";
 
 const GetNonceSchema = z.object({
     address: z.string().min(42).max(42).describe("Ethereum wallet address"),
@@ -72,6 +73,7 @@ export class GetNonceRoute extends OpenAPIRoute {
         const { expiresAt } = this.cacheService.put(address, message, {
             expirationTtl: 120,
         });
+
         return {
             expiresAt,
             nonce,
@@ -83,6 +85,7 @@ export class GetNonceRoute extends OpenAPIRoute {
 export class Web3LoginRoute extends OpenAPIRoute {
     private readonly cacheService = CacheService.getInstance();
     private readonly userService = UserService.get();
+    private readonly referralService = ReferralService.get();
 
     schema = {
         request: {
@@ -97,6 +100,14 @@ export class Web3LoginRoute extends OpenAPIRoute {
         responses: {
             200: {
                 description: "Web3 authentication successful",
+                content: {
+                    "application/json": {
+                        schema: AuthResponseSchema,
+                    },
+                },
+            },
+            201: {
+                description: "User created and authenticated",
                 content: {
                     "application/json": {
                         schema: AuthResponseSchema,
@@ -128,7 +139,14 @@ export class Web3LoginRoute extends OpenAPIRoute {
 
     async handle(ctx: AppContext) {
         const {
-            body: { address, signature, message, email = null, name = null },
+            body: {
+                address,
+                signature,
+                message,
+                email = null,
+                name = null,
+                referralCode = null,
+            },
         } = await this.getValidatedData<typeof this.schema>();
 
         if (!message.length || this.cacheService.get(address) !== message) {
@@ -138,25 +156,36 @@ export class Web3LoginRoute extends OpenAPIRoute {
             return ctx.json({ error: "Invalid signature" }, 401);
         }
 
-        const user = await this.userService.findOrCreateUserByAddress(address, {
-            ...(email?.length ? { email: email.trim().toLowerCase() } : {}),
-            ...(name?.length ? { name } : {}),
-        });
+        if (
+            referralCode?.length &&
+            !(await this.referralService.findUserByReferralCode(referralCode))
+        ) {
+          return ctx.json({ error: "Invalid referral code!" }, 400);
+        }
 
-        // Generate JWT token
+        const { user, created } =
+            await this.userService.findOrCreateUserByAddress(address, {
+                ...(email?.length ? { email: email.trim().toLowerCase() } : {}),
+                ...(name?.length ? { name } : {}),
+            });
+
         const token = generateToken({
             userId: user.id,
             address: user.address,
         });
 
+        if(created) {
+          ctx.status(201);
+          if(referralCode?.length) {
+            await this.referralService.linkUserToReferrers(user, referralCode, true);
+          }
+        } else {
+          ctx.status(200);
+        }
+
         return {
             token,
-            user: {
-                id: user.id,
-                address: user.address,
-                name: user.name,
-                email: user.email,
-            },
+            user,
         };
     }
 }
