@@ -33,9 +33,9 @@ model User {
   updatedAt    DateTime               @updatedAt @map("updated_at")
   transactions ProcessedTransaction[]
   pointHistory PointHistory[]
-
-  referrers Referral[] @relation("ReferrerUser")
-  referrees Referral[] @relation("RefereeUser")
+  isAdmin      Boolean                @default(false) @map("is_admin")
+  referrers    Referral[]             @relation("ReferrerUser")
+  referrees    Referral[]             @relation("RefereeUser")
 }
 
 model Block {
