@@ -99,11 +99,11 @@ model PointHistory {
   updatedAt DateTime? @map("updated_at")
 
   ruleId        Int
-  rule          PointSystemRule      @relation(fields: [ruleId], references: [id])
-  transactionId BigInt               @map("trx_id")
-  transaction   ProcessedTransaction @relation(fields: [transactionId], references: [id])
-  userId        Int?                 @map("user_id")
-  user          User?                @relation(fields: [userId], references: [id])
+  rule          PointSystemRule       @relation(fields: [ruleId], references: [id])
+  transactionId BigInt?               @map("trx_id")
+  transaction   ProcessedTransaction? @relation(fields: [transactionId], references: [id])
+  userId        Int?                  @map("user_id")
+  user          User?                 @relation(fields: [userId], references: [id])
 }
 
 model Referral {
@@ -117,4 +117,21 @@ model Referral {
   layer Int @default(0)
 
   @@id([referrerId, userId])
+}
+
+enum ReferralRewardType {
+  POINT
+  MON
+  // Other types or tokens
+}
+
+model ReferralRules {
+  id                   Int                @id @default(autoincrement())
+  activisionReward     Float              @default(0) @map("activision_reward") // Amount which goes to both referee and referrer right after linking
+  activisionRewardType ReferralRewardType @default(POINT) @map("activision_reward_type")
+  directRewardRatio    Float              @default(0.1) @map("direct_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
+  directRewardType     ReferralRewardType @default(POINT) @map("direct_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
+  indirectRewardRatio  Float              @default(0.01) @map("indirect_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
+  indirectRewardType   ReferralRewardType @default(POINT) @map("indirect_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
+  devidByLayer         Boolean            @default(false) @map("devide_by_layer") // Affect referral layer in rewards amount, deviding the final reward on (layer + 1)
 }
