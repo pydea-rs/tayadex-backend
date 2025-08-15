@@ -1,5 +1,5 @@
 import { prisma } from "@/services";
-import { User } from "@prisma/client";
+import { ReferralCriteriaModes, ReferralRules, User } from "@prisma/client";
 
 export class ReferralService {
     private static singleInstance: ReferralService;
@@ -256,5 +256,200 @@ export class ReferralService {
             }
         }
         return null;
+    }
+
+    async organizeReferralRelationsByReferrer(
+        where: Record<string, unknown> = {}
+    ) {
+        const relations = await prisma.referral.findMany({
+            where,
+            include: { referrer: true },
+            orderBy: { layer: "asc" },
+        });
+        const referrers: Record<
+            string,
+            { referrer: User; referees: number[] }
+        > = {};
+
+        for (const ref of relations) {
+            if (!referrers[ref.referrer.id]) {
+                referrers[ref.referrer.id] = {
+                    referrer: ref.referrer,
+                    referees: [ref.userId],
+                };
+            } else {
+                referrers[ref.referrer.id].referees.push(ref.userId);
+            }
+        }
+        return referrers;
+    }
+
+    async calculateRefereesEfforts(
+        referrerId: number,
+        referees: number[],
+        rules: ReferralRules,
+        until: Date = new Date(),
+        {
+            fromScratch = false,
+            bypassLayerEffect = false,
+        }: { fromScratch?: boolean; bypassLayerEffect?: boolean } = {}
+    ) {
+        if (!referees?.length) {
+            return 0;
+        }
+        switch (rules.criteria) {
+            case ReferralCriteriaModes.POINTS: {
+                if (!bypassLayerEffect && rules.devidByLayer) {
+                    const inPsqlArray =
+                        referees.length > 1
+                            ? `ANY(ARRAY[${referees.join(", ")}])`
+                            : referees[0].toString();
+                    const extraCondition = !fromScratch
+                        ? `AND ph."created_at" > ${rules.lastPaymentAt}`
+                        : "";
+
+                    const results = await prisma.$queryRaw<
+                        Array<{
+                            totalPoints: number;
+                        }>
+                    >`
+                        SELECT SUM(ph."amount" / (rf."layer" + 1)) as "totalPoints"
+                        FROM "PointHistory" ph
+                        INNER JOIN "Referral" rf ON ph."user_id" = rf."user_id" 
+                            AND rf."referrer_id" = ${referrerId}
+                        WHERE ph."user_id" = ${inPsqlArray} 
+                            AND ph."created_at" <= ${until} 
+                            ${extraCondition}
+                    `;
+                    return results?.[0]?.totalPoints ?? 0;
+                } else {
+                    const inPsqlArray =
+                        referees.length > 1
+                            ? `ANY(ARRAY[${referees.join(", ")}])`
+                            : referees[0].toString();
+                    const extraCondition = !fromScratch
+                        ? `AND ph."created_at" > ${rules.lastPaymentAt}`
+                        : "";
+
+                    const results = await prisma.$queryRaw<
+                        Array<{
+                            totalPoints: number;
+                        }>
+                    >`
+                        SELECT SUM(ph."amount") as "totalPoints"
+                        FROM "PointHistory" ph
+                        WHERE ph."user_id" = ${inPsqlArray} 
+                            AND ph."created_at" <= ${until} 
+                            ${extraCondition}
+                    `;
+                    return results?.[0]?.totalPoints ?? 0;
+                }
+            }
+            case ReferralCriteriaModes.TRANSACTIONS:
+            // TODO:
+            case ReferralCriteriaModes.MINTS_ONLY:
+            // TODO:
+            case ReferralCriteriaModes.SWAPS_ONLY:
+                // TODO:
+                break;
+        }
+        throw new Error("This operation is not implemented yet!");
+    }
+
+    async rewardUserByRule(
+        links: {
+            referrer: User;
+            referees: number[];
+        },
+        rules: ReferralRules,
+        untilDate: Date = new Date(),
+        direct: boolean = true
+    ) {
+        const refereesEfforts = await this.calculateRefereesEfforts(
+            links.referrer.id,
+            links.referees,
+            rules,
+            untilDate,
+            { bypassLayerEffect: direct }
+        );
+
+        const reward =
+            refereesEfforts *
+            (direct ? rules.directRewardRatio : rules.indirectRewardRatio);
+        // TODO: Round reward
+
+        // TODO: Create reward point history or tx
+    }
+
+    async distributeReferrals(rules: ReferralRules) {
+        const until = new Date();
+        const period = { from: rules.lastPaymentAt, until };
+
+        let referrers = await this.organizeReferralRelationsByReferrer({
+            layer: 0,
+        });
+
+        if (rules.directRewardRatio > 0) {
+            for (const referrerId in referrers) {
+                const { referrer, referees } = referrers[referrerId];
+                this.rewardUserByRule(
+                    referrers[referrerId],
+                    rules,
+                    until,
+                    true
+                ).catch((ex) => {
+                    console.error(
+                        "Failed to pay user referrals direct share.",
+                        ex as Error,
+                        {
+                            data: {
+                                referees,
+                                referrerId: referrer.id,
+                                trewardTypeype: rules.directRewardType,
+                                ratio: rules.directRewardRatio,
+                                type: "Direct",
+                            },
+                        }
+                    );
+                });
+            }
+        }
+        if (!rules.indirectRewardRatio) {
+            return;
+        }
+
+        referrers = await this.organizeReferralRelationsByReferrer({
+            layer: { gt: 0 },
+        });
+
+        for (const referrerId in referrers) {
+            const { referrer, referees } = referrers[referrerId];
+            this.rewardUserByRule(
+                referrers[referrerId],
+                rules,
+                until,
+                false
+            ).catch((ex) => {
+                console.error(
+                    "Failed to pay user referrals indirect share.",
+                    ex as Error,
+                    {
+                        data: {
+                            referees,
+                            referrerId: referrer.id,
+                            rewardType: rules.indirectRewardType,
+                            ratio: rules.indirectRewardRatio,
+                            type: "Indirect",
+                        },
+                    }
+                );
+            });
+        }
+
+        rules.lastPaymentAt = period.until;
+        await prisma.referralRules.update({
+            where: { id: rules.id },
+            data: rules,
+        });
     }
 }

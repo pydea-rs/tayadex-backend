@@ -110,13 +110,22 @@ model Referral {
   createdAt DateTime @default(now())
 
   referrer   User @relation("ReferrerUser", fields: [referrerId], references: [id])
-  referrerId Int
+  referrerId Int  @map("referrer_id")
   user       User @relation("RefereeUser", fields: [userId], references: [id])
-  userId     Int
+  userId     Int  @map("user_id")
 
   layer Int @default(0)
 
   @@id([referrerId, userId])
+}
+
+// The parameter which specifies how much a referee has spend (or has been active), which then will
+// multiplied in referral-rule ratios; And the result will be rewarded to the referrer
+enum ReferralCriteriaModes {
+  POINTS
+  TRANSACTIONS
+  SWAPS_ONLY
+  MINTS_ONLY
 }
 
 enum ReferralRewardType {
@@ -125,13 +134,18 @@ enum ReferralRewardType {
   // Other types or tokens
 }
 
+// FIXME: Define SupportedTokens enum and replace All token types with its values; So postgres can better index them.
+
 model ReferralRules {
-  id                   Int                @id @default(autoincrement())
-  activisionReward     Float              @default(0) @map("activision_reward") // Amount which goes to both referee and referrer right after linking
-  activisionRewardType ReferralRewardType @default(POINT) @map("activision_reward_type")
-  directRewardRatio    Float              @default(0.1) @map("direct_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
-  directRewardType     ReferralRewardType @default(POINT) @map("direct_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
-  indirectRewardRatio  Float              @default(0.01) @map("indirect_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
-  indirectRewardType   ReferralRewardType @default(POINT) @map("indirect_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
-  devidByLayer         Boolean            @default(false) @map("devide_by_layer") // Affect referral layer in rewards amount, deviding the final reward on (layer + 1)
+  id                   Int                   @id @default(autoincrement())
+  criteria             ReferralCriteriaModes @default(POINTS) @map("criteria")
+  criteriaToken        String?               @map("criteria_token") // In case basis is not POINTS
+  activisionReward     Float                 @default(0) @map("activision_reward") // Amount which goes to both referee and referrer right after linking
+  activisionRewardType ReferralRewardType    @default(POINT) @map("activision_reward_type")
+  directRewardRatio    Float                 @default(0.1) @map("direct_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
+  directRewardType     ReferralRewardType    @default(POINT) @map("direct_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
+  indirectRewardRatio  Float                 @default(0.01) @map("indirect_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
+  indirectRewardType   ReferralRewardType    @default(POINT) @map("indirect_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
+  devidByLayer         Boolean               @default(false) @map("devide_by_layer") // Affect referral layer in rewards amount, deviding the final reward on (layer + 1)
+  lastPaymentAt        DateTime?             @map("last_payment_at")
 }
