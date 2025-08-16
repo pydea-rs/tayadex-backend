@@ -38,13 +38,14 @@ export class EventIndexer {
     if(this.alreadyListening) {
       return;
     }
+    console.log('Indexer next round started...')
     try {
       const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
       this.lock();
-      const [lastSwapBlock, lastMintBurnBlock] = [
-        await this.checkoutSwapEvents(currentBlockNumber),
-        await this.checkoutLiquidityEvents(currentBlockNumber),
-      ]
+      const [lastSwapBlock, lastMintBurnBlock] = await Promise.all([
+        this.checkoutSwapEvents(currentBlockNumber),
+        this.checkoutLiquidityEvents(currentBlockNumber),
+      ]);
       this.unlock();
       await this.blockchainService.updateLastIndexedBlock(
         lastSwapBlock < lastMintBurnBlock ? lastSwapBlock : lastMintBurnBlock
@@ -56,8 +57,6 @@ export class EventIndexer {
 
   public async checkoutSwapEvents(untilBlock: bigint) {
     let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 5253609n;
-
-    console.log(`SwapEvents of blocks in range of ${lastSuccessfullyIndexedBlock} -> ${untilBlock}`);
 
     // Process blocks in batches to avoid overwhelming the RPC
     const batchSize = BigInt(this.blockchainService["config"].batchSize);
@@ -119,8 +118,6 @@ export class EventIndexer {
   public async checkoutLiquidityEvents(untilBlock: bigint) {
     let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 5253609n;
 
-    console.log(`Liquidity of blocks in range of ${lastSuccessfullyIndexedBlock} -> ${untilBlock}`);
-    // Process blocks in batches to avoid overwhelming the RPC
     const batchSize = BigInt(this.blockchainService["config"].batchSize);
     const maxBatchSteps = this.blockchainService["config"].maxBatchSteps ?? 100;
     let fromBlock = lastSuccessfullyIndexedBlock + 1n;

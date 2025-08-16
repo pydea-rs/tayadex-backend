@@ -9,7 +9,6 @@ const eventIndexerService = EventIndexer.get()
 
 // Schedule the cron job to run every 10 seconds
 cron.schedule('*/10 * * * * *', () => {
-  console.log('Running event indexer...')
   eventIndexerService.listen().catch(error => {
     console.error('Event indexer failed:', error)
   })
