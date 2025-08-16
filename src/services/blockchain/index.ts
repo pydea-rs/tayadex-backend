@@ -2,6 +2,8 @@ import { createPublicClient, http, parseAbi, type Address } from 'viem'
 import { monadTestnet } from 'viem/chains'
 import { getConfig, type BlockchainConfig } from './config'
 import { ethers } from 'ethers'
+import { prisma } from "../prisma";
+import { Chain } from '@prisma/client';
 
 // ABI for parsing events
 const PAIR_ABI = parseAbi([
@@ -72,6 +74,7 @@ export class BlockchainService {
   private config: BlockchainConfig
   private tokenCache: Map<string, TokenInfo> = new Map()
   private pairCache: Map<string, PairInfo> = new Map()
+  private _defaultChain: Chain | null = null;
 
   private constructor() {
     this.config = getConfig()
@@ -79,6 +82,33 @@ export class BlockchainService {
       chain: monadTestnet,
       transport: http(this.config.rpcUrl),
     })
+    this.init().catch(err => console.error('Initialing BlockchainService failed: ', err));
+  }
+
+  async init() {
+    this._defaultChain = await prisma.chain.findFirst({where: { id: this.config.chainId }})
+    if(!this._defaultChain) {
+      throw new Error('Failed loading chain; Indexer will not work correctly.')
+    }
+  }
+
+  public get defaultChain(): Chain {
+    if(!this._defaultChain) {
+      this.init();
+      throw new Error('Failed loading default chain; Indexer will not work correctly; try again later.')
+    }
+    return this._defaultChain;
+  }
+
+  async updateLastIndexedBlock(blockNumber: bigint) {
+    if(!this._defaultChain) {
+      await this.init();
+      if(!this._defaultChain) {
+        throw new Error("Chain data is still unavailable; So can't update lastIndexedBlock value")
+      }
+    }
+    this._defaultChain.lastIndexedBlock = blockNumber;
+    await prisma.chain.update({ where: { id: this._defaultChain.id }, data: this._defaultChain });
   }
 
   static get(): BlockchainService {

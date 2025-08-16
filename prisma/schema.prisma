@@ -38,14 +38,6 @@ model User {
   referrees    Referral[]             @relation("RefereeUser")
 }
 
-model Block {
-  id                    Int                    @id @default(autoincrement())
-  number                BigInt                 @unique
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-  processedTransactions ProcessedTransaction[]
-}
-
 enum TransactionType {
   SWAP
   MINT
@@ -54,11 +46,20 @@ enum TransactionType {
   OTHER
 }
 
+model Chain {
+  id                   Int                    @id
+  name                 String
+  rpc                  String
+  lastIndexedBlock     BigInt?                @map("last_indexed_block")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime?              @map("updated_at")
+  transactions ProcessedTransaction[]
+}
+
 model ProcessedTransaction {
   id           BigInt          @id @default(autoincrement())
   hash         String
-  blockId      Int             @map("block_id")
-  block        Block           @relation(fields: [blockId], references: [id])
+  blockNumber  BigInt          @map("block_number")
   from         String
   to           String
   token0       String
@@ -71,6 +72,8 @@ model ProcessedTransaction {
 
   userId        Int?           @map("user_id")
   user          User?          @relation(fields: [userId], references: [id])
+  chainId       Int            @map("chain_id")
+  chain         Chain          @relation(fields: [chainId], references: [id])
   relatedPoints PointHistory[]
 }
 

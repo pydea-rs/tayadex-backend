@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "ProcessedTransaction" ALTER COLUMN "token0_amount" SET DATA TYPE DOUBLE PRECISION,
-ALTER COLUMN "token1_amount" SET DATA TYPE DOUBLE PRECISION;
