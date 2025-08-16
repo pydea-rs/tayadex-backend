@@ -11,6 +11,8 @@ export class EventIndexer {
   private readonly pointService = PointService.get();
   private readonly userService = UserService.get();
 
+  private alreadyListening: boolean = false;
+
   static get() {
     if (EventIndexer.singleInstance) {
       return EventIndexer.singleInstance;
@@ -24,14 +26,26 @@ export class EventIndexer {
     }
   }
 
+  lock() {
+    this.alreadyListening = true;
+  }
+
+  unlock() {
+    this.alreadyListening = false;
+  }
+
   async listen() {
+    if(this.alreadyListening) {
+      return;
+    }
     try {
       const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
-
+      this.lock();
       const [lastSwapBlock, lastMintBurnBlock] = [
         await this.checkoutSwapEvents(currentBlockNumber),
         await this.checkoutLiquidityEvents(currentBlockNumber),
       ]
+      this.unlock();
       await this.blockchainService.updateLastIndexedBlock(
         lastSwapBlock < lastMintBurnBlock ? lastSwapBlock : lastMintBurnBlock
       );
@@ -41,23 +55,24 @@ export class EventIndexer {
   }
 
   public async checkoutSwapEvents(untilBlock: bigint) {
-    let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 0n;
+    let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 5253609n;
 
-    console.log(`Swap events from block ${lastSuccessfullyIndexedBlock} -> ${untilBlock}`);
+    console.log(`SwapEvents of blocks in range of ${lastSuccessfullyIndexedBlock} -> ${untilBlock}`);
 
     // Process blocks in batches to avoid overwhelming the RPC
     const batchSize = BigInt(this.blockchainService["config"].batchSize);
+    const maxBatchSteps = this.blockchainService["config"].maxBatchSteps ?? 100;
     let fromBlock = lastSuccessfullyIndexedBlock + 1n;
     
-    while (fromBlock <= untilBlock) {
+    for (let step = 0; fromBlock <= untilBlock && step < maxBatchSteps; step++) {
       const toBlock = fromBlock + batchSize - 1n > untilBlock 
         ? untilBlock 
         : fromBlock + batchSize - 1n;
-      
+      console.log(`SwapEvents: ${fromBlock} -> ${toBlock}`)
       try {
         const swaps = await this.blockchainService.getSwapEvents(fromBlock, toBlock);
 
-        for (const swap of swaps) {
+        await Promise.all(swaps.map(async (swap) => {
           try {
             const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
               swap.transaction.id,
@@ -84,7 +99,7 @@ export class EventIndexer {
           } catch (error) {
             console.error(`Error processing swap ${swap.id}:`, error);
           }
-        }
+        }));
         lastSuccessfullyIndexedBlock = toBlock;
       } catch (error) {
         console.error(`Error fetching swaps from blocks ${fromBlock}-${toBlock}:`, error);
@@ -92,85 +107,96 @@ export class EventIndexer {
       }
       
       fromBlock = toBlock + 1n;
+
+      if(fromBlock < untilBlock) {
+        await new Promise(resolve => setTimeout(resolve, 500)) // TODO: See if there's better way.
+      }
     }
     console.log(`Swap Events successfully processed until block#${lastSuccessfullyIndexedBlock}.`)
     return lastSuccessfullyIndexedBlock; 
   }
 
   public async checkoutLiquidityEvents(untilBlock: bigint) {
-    let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 0n;
+    let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 5253609n;
 
-    console.log(`Liquidity events from block ${lastSuccessfullyIndexedBlock} -> ${untilBlock}`);
+    console.log(`Liquidity of blocks in range of ${lastSuccessfullyIndexedBlock} -> ${untilBlock}`);
     // Process blocks in batches to avoid overwhelming the RPC
     const batchSize = BigInt(this.blockchainService["config"].batchSize);
+    const maxBatchSteps = this.blockchainService["config"].maxBatchSteps ?? 100;
     let fromBlock = lastSuccessfullyIndexedBlock + 1n;
     
-    while (fromBlock <= untilBlock) {
+    for (let step = 0; fromBlock <= untilBlock && step < maxBatchSteps; step++) {
       const toBlock = fromBlock + batchSize - 1n > untilBlock 
         ? untilBlock 
         : fromBlock + batchSize - 1n;
-      
+      console.log(`LiquidityEvents: ${fromBlock} -> ${toBlock}`)
       try {
         const { mints, burns } = await this.blockchainService.getLiquidityEvents(fromBlock, toBlock);
 
-        for (const mint of mints) {
-          try {
-            const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
-              mint.transaction.id,
-              TransactionType.MINT,
-              mint.blockNumber,
-              [
-                {
-                  symbol: mint.pair.token0.symbol,
-                  decimals: mint.pair.token0.decimals,
-                  amount: mint.amount0,
-                },
-                {
-                  symbol: mint.pair.token1.symbol,
-                  decimals: mint.pair.token1.decimals,
-                  amount: mint.amount1,
-                },
-              ],
-              mint.to
-            );
-
-            if (!alreadyProcessed) {
-              await this.processNewLiquidityEvent(tx, user);
+        await Promise.all(
+          mints.map(async (mint) => {
+            try {
+              const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
+                mint.transaction.id,
+                TransactionType.MINT,
+                mint.blockNumber,
+                [
+                  {
+                    symbol: mint.pair.token0.symbol,
+                    decimals: mint.pair.token0.decimals,
+                    amount: mint.amount0,
+                  },
+                  {
+                    symbol: mint.pair.token1.symbol,
+                    decimals: mint.pair.token1.decimals,
+                    amount: mint.amount1,
+                  },
+                ],
+                mint.to
+              );
+              
+              if (!alreadyProcessed) {
+                await this.processNewLiquidityEvent(tx, user);
+              }
+            } catch (error) {
+              // FIXME: In case one event log wasnt processed, how we can inform indexer about that?
+              // TODO/SOLUTION: Hmm. Maybe push failed tx Hashes to an array and try them later?!
+              console.error(`Error processing mint ${mint.id}:`, error);
             }
-          } catch (error) {
-            // FIXME: In case one event log wasnt processed, how we can inform indexer about that?
-            console.error(`Error processing mint ${mint.id}:`, error);
           }
-        }
+        ));
 
-        for (const burn of burns) {
-          try {
-            const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
-              burn.transaction.id,
-              TransactionType.BURN,
-              burn.blockNumber,
-              [
-                {
-                  symbol: burn.pair.token0.symbol,
-                  decimals: burn.pair.token0.decimals,
-                  amount: -burn.amount0, // Negative for burn events
-                },
-                {
-                  symbol: burn.pair.token1.symbol,
-                  decimals: burn.pair.token1.decimals,
-                  amount: -burn.amount1, // Negative for burn events
-                },
-              ],
-              burn.to
-            );
-
-            if (!alreadyProcessed) {
-              await this.processNewLiquidityEvent(tx, user);
+        await Promise.all(
+          burns.map(async (burn) => {
+              try {
+                const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
+                burn.transaction.id,
+                TransactionType.BURN,
+                burn.blockNumber,
+                [
+                  {
+                    symbol: burn.pair.token0.symbol,
+                    decimals: burn.pair.token0.decimals,
+                    amount: -burn.amount0, // Negative for burn events
+                  },
+                  {
+                    symbol: burn.pair.token1.symbol,
+                    decimals: burn.pair.token1.decimals,
+                    amount: -burn.amount1, // Negative for burn events
+                  },
+                ],
+                burn.to
+              );
+              
+              if (!alreadyProcessed) {
+                await this.processNewLiquidityEvent(tx, user);
+              }
+            } catch (error) {
+              console.error(`Error processing burn ${burn.id}:`, error);
             }
-          } catch (error) {
-            console.error(`Error processing burn ${burn.id}:`, error);
           }
-        }
+        ));
+
         lastSuccessfullyIndexedBlock = toBlock;
       } catch (error) {
         console.error(`Error fetching liquidity events from blocks ${fromBlock}-${toBlock}:`, error);
@@ -178,6 +204,9 @@ export class EventIndexer {
       }
       
       fromBlock = toBlock + 1n;
+      if(fromBlock < untilBlock) {
+        await  new Promise(resolve => setTimeout(resolve, 500))
+      }
     }
     console.log(`Liquidity Events successfully processed until block#${lastSuccessfullyIndexedBlock}.`)
     return lastSuccessfullyIndexedBlock;

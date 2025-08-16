@@ -70,7 +70,7 @@ export class PointService {
             case TransactionType.BURN:
                 return (
                     rule.baseValue +
-                    rule.relativeValue *
+                    rule.relativeValue * // relativeValue must be positive
                         (trx.token0Amount + (trx.token1Amount ?? 0))
                 );
         }

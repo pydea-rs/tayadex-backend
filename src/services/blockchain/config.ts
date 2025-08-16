@@ -3,6 +3,7 @@ export interface BlockchainConfig {
   chainId: number
   factoryAddress: string
   batchSize: number
+  maxBatchSteps: number
   maxRetries: number
   retryDelay: number
 }
@@ -11,7 +12,8 @@ export const DEFAULT_CONFIG: BlockchainConfig = {
   rpcUrl: process.env.RPC_URL || 'https://testnet-rpc.monad.xyz',
   chainId: +(process.env.CHAIN_ID || 10143),
   factoryAddress: '0xf3fd5503fb2bb5f5a7ae713e621ac5c50f191fb3',
-  batchSize: 5,
+  batchSize: 25,
+  maxBatchSteps: 4,
   maxRetries: 3,
   retryDelay: 1000, // 1 second
 }
