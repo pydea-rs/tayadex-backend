@@ -7,7 +7,7 @@ export class CacheService {
   private cache = new Map<string, CacheEntry>();
   private static singleInstance: CacheService;
 
-  static getInstance() {
+  static getStore() {
     if(CacheService.singleInstance) {
       return CacheService.singleInstance;
     }

@@ -1,8 +1,10 @@
-import { prisma } from "@/services";
-import { ReferralCriteriaModes, ReferralRules, User } from "@prisma/client";
+import { PointService, prisma } from "@/services";
+import { approximate } from "@/utils";
+import { ReferralCriteriaModes, ReferralRewardType, ReferralRules, User } from "@prisma/client";
 
 export class ReferralService {
     private static singleInstance: ReferralService;
+    private readonly pointService = PointService.get();
 
     public static get() {
         if (ReferralService.singleInstance) {
@@ -373,17 +375,25 @@ export class ReferralService {
             { bypassLayerEffect: direct }
         );
 
-        const reward =
-            refereesEfforts *
-            (direct ? rules.directRewardRatio : rules.indirectRewardRatio);
-        // TODO: Round reward
+        const [actualReward, rewardType] = direct ? 
+            [refereesEfforts * rules.directRewardRatio, rules.directRewardType] 
+            : [refereesEfforts * rules.indirectRewardRatio, rules.indirectRewardType];
 
-        // TODO: Create reward point history or tx
+        const reward = approximate(actualReward, "ceil", 2);
+        
+        switch(rewardType) {
+            case ReferralRewardType.POINT:
+                // TODO:
+                break;
+            case ReferralRewardType.MON:
+                // TODO:
+            default:
+                throw new Error('Not implemented yet!');
+        }
     }
 
     async distributeReferrals(rules: ReferralRules) {
         const until = new Date();
-        const period = { from: rules.lastPaymentAt, until };
 
         let referrers = await this.organizeReferralRelationsByReferrer({
             layer: 0,
@@ -446,7 +456,7 @@ export class ReferralService {
             });
         }
 
-        rules.lastPaymentAt = period.until;
+        rules.lastPaymentAt = until;
         await prisma.referralRules.update({
             where: { id: rules.id },
             data: rules,

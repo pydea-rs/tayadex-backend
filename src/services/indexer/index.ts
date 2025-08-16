@@ -7,7 +7,7 @@ import { UserService } from "../user";
 
 export class EventIndexer {
   private static singleInstance: EventIndexer;
-  private blockchainService: BlockchainService = BlockchainService.getInstance();;
+  private readonly blockchainService: BlockchainService = BlockchainService.get();;
   private readonly pointService = PointService.get();
   private readonly userService = UserService.get();
   static get() {
@@ -32,16 +32,20 @@ export class EventIndexer {
         }`
       );
 
-      await this.checkoutSwapEvents(lastBlock);
-      await this.checkoutLiquidityEvents(lastBlock);
-
+      const [lastSwapBlock, lastMintBurnBlock] = [
+        await this.checkoutSwapEvents(lastBlock),
+        await this.checkoutLiquidityEvents(lastBlock),
+      ]
+      await this.saveBlock(
+        lastSwapBlock < lastMintBurnBlock ? lastSwapBlock : lastMintBurnBlock
+      );
     } catch (error) {
       console.error("Listener failed on this round:", error);
     }
   }
 
   public async checkoutSwapEvents(lastBlock: Block | null) {
-    console.log(`Indexing swaps from block ${lastBlock}`);
+    console.log(`Indexing swaps from block ${lastBlock?.number}`);
 
     const latestBlockNumber = lastBlock?.number ?? 5253609n;
     const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
@@ -62,7 +66,7 @@ export class EventIndexer {
           try {
             const block =
               !lastBlock || lastBlock.number !== swap.blockNumber
-                ? await this.saveLastProcessedBlock(swap.blockNumber)
+                ? await this.saveAndFetchBlock(swap.blockNumber)
                 : lastBlock;
             
             const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
@@ -98,10 +102,11 @@ export class EventIndexer {
       
       fromBlock = toBlock + 1n;
     }
+    return currentBlockNumber; 
   }
 
   public async checkoutLiquidityEvents(lastBlock: Block | null) {
-    console.log(`Indexing liquidity events from block ${lastBlock}`);
+    console.log(`Indexing liquidity events from block ${lastBlock?.number}`);
 
     const latestBlockNumber = lastBlock?.number ?? 0n;
     const currentBlockNumber = await this.blockchainService.getLatestBlockNumber();
@@ -122,7 +127,7 @@ export class EventIndexer {
           try {
             const block =
               !lastBlock || lastBlock.number !== mint.blockNumber
-                ? await this.saveLastProcessedBlock(mint.blockNumber)
+                ? await this.saveAndFetchBlock(mint.blockNumber)
                 : lastBlock;
 
             const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
@@ -157,7 +162,7 @@ export class EventIndexer {
           try {
             const block =
               !lastBlock || lastBlock.number !== burn.blockNumber
-                ? await this.saveLastProcessedBlock(burn.blockNumber)
+                ? await this.saveAndFetchBlock(burn.blockNumber)
                 : lastBlock;
 
             const { tx, user, alreadyProcessed } = await this.markTransactionProcessed(
@@ -193,6 +198,7 @@ export class EventIndexer {
       
       fromBlock = toBlock + 1n;
     }
+    return currentBlockNumber;
   }
 
   public async processNewSwapEvent(tx: ProcessedTransaction, user?: User | null) {
@@ -225,17 +231,17 @@ export class EventIndexer {
 
   public async getLastProcessedBlock(): Promise<Block | null> {
     return prisma.block.findFirst({
-      orderBy: { createdAt: "desc" },
+      orderBy: { number: "desc" },
     });
   }
 
-  public async saveLastProcessedBlock(
-    blockNumber: number | bigint
+  async saveAndFetchBlock(
+    blockNumber: number | bigint,
   ): Promise<Block> {
+    blockNumber = BigInt(blockNumber);
     try {
-      // Try to create the block directly
-      return await prisma.block.create({
-        data: { number: BigInt(blockNumber) },
+      return prisma.block.create({
+        data: { number: blockNumber },
       });
     } catch (error) {
       const existingBlock = await prisma.block.findFirst({
@@ -250,7 +256,21 @@ export class EventIndexer {
     }
   }
 
-  public async isTransactionProcessed(
+
+  async saveBlock(
+    blockNumber: number | bigint,
+  ): Promise<void> {
+    blockNumber = BigInt(blockNumber);
+    try {
+      await prisma.block.upsert({
+        where: { number: blockNumber },
+        create: { number: blockNumber },
+        update: {},
+      });
+    } catch (error) { }
+  }
+
+  async isTransactionProcessed(
     txHash: string,
     eventType: TransactionType | string // TODO: Is this required?
   ): Promise<boolean> {
@@ -261,7 +281,7 @@ export class EventIndexer {
     );
   }
 
-  public async markTransactionProcessed(
+  async markTransactionProcessed(
     txHash: string,
     eventType: string | TransactionType,
     blockId: number,

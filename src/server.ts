@@ -16,7 +16,7 @@ cron.schedule('*/10 * * * * *', () => {
 })
 
 
-const cacheService = CacheService.getInstance();
+const cacheService = CacheService.getStore();
 
 cron.schedule('*/5 * * * *', () => {
   cacheService.cleanup();

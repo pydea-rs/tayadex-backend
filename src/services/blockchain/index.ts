@@ -3,11 +3,6 @@ import { monadTestnet } from 'viem/chains'
 import { getConfig, type BlockchainConfig } from './config'
 import { ethers } from 'ethers'
 
-// Event signatures for TayaSwap V2
-const SWAP_EVENT_SIGNATURE = 'Swap(address,uint256,uint256,uint256,uint256,address)'
-const MINT_EVENT_SIGNATURE = 'Mint(address,uint256,uint256)'
-const BURN_EVENT_SIGNATURE = 'Burn(address,uint256,uint256,address)'
-
 // ABI for parsing events
 const PAIR_ABI = parseAbi([
   'event Swap(address indexed sender, uint amount0In, uint amount1In, uint amount0Out, uint amount1Out, address indexed to)',
@@ -33,7 +28,6 @@ export interface SwapEvent {
   amount0Out: bigint
   amount1Out: bigint
   blockNumber: bigint
-  timestamp: bigint
   transaction: { id: string }
   pair: {
     id: string
@@ -49,7 +43,6 @@ export interface LiquidityEvent {
   amount0: bigint
   amount1: bigint
   blockNumber: bigint
-  timestamp: bigint
   transaction: { id: string }
   pair: {
     id: string
@@ -88,14 +81,14 @@ export class BlockchainService {
     })
   }
 
-  static getInstance(): BlockchainService {
+  static get(): BlockchainService {
     if (!BlockchainService.instance) {
       BlockchainService.instance = new BlockchainService()
     }
     return BlockchainService.instance
   }
 
-  private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+  async withRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null
     
     for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
@@ -114,13 +107,12 @@ export class BlockchainService {
     throw lastError || new Error('Operation failed after all retries')
   }
 
-  private async getTokenInfo(tokenAddress: string): Promise<TokenInfo> {
-    // Check cache first
-    if (this.tokenCache.has(tokenAddress)) {
-      return this.tokenCache.get(tokenAddress)!
+  async getTokenInfo(tokenAddress: string): Promise<TokenInfo> {
+    const savedTokenData = this.tokenCache.get(tokenAddress);
+    if (savedTokenData) {
+      return savedTokenData;
     }
 
-    // Fetch token info
     const [symbol, decimals] = await Promise.all([
       this.withRetry(() => this.client.readContract({
         address: tokenAddress as Address,
@@ -139,13 +131,12 @@ export class BlockchainService {
     return tokenInfo
   }
 
-  private async getPairInfo(pairAddress: string): Promise<PairInfo> {
-    // Check cache first
-    if (this.pairCache.has(pairAddress)) {
-      return this.pairCache.get(pairAddress)!
+  async getPairInfo(pairAddress: string): Promise<PairInfo> {
+    const savedTokenData = this.pairCache.get(pairAddress);
+    if (savedTokenData) {
+      return savedTokenData;
     }
 
-    // Get token addresses
     const [token0Address, token1Address] = await Promise.all([
       this.withRetry(() => this.client.readContract({
         address: pairAddress as Address,
@@ -159,7 +150,6 @@ export class BlockchainService {
       })),
     ])
 
-    // Get token info (this will use cache if available)
     const [token0Info, token1Info] = await Promise.all([
       this.getTokenInfo(token0Address),
       this.getTokenInfo(token1Address),
@@ -173,7 +163,7 @@ export class BlockchainService {
     return pairInfo
   }
 
-  private async batchGetPairInfo(pairAddresses: string[]): Promise<Map<string, PairInfo>> {
+  async batchGetPairInfo(pairAddresses: string[]): Promise<Map<string, PairInfo>> {
     const uniqueAddresses = [...new Set(pairAddresses)]
     const results = new Map<string, PairInfo>()
     
@@ -207,7 +197,7 @@ export class BlockchainService {
     return results
   }
 
-  private async batchGetBlocks(blockNumbers: bigint[]): Promise<Map<bigint, any>> {
+  async batchGetBlocks(blockNumbers: bigint[]): Promise<Map<bigint, any>> {
     const uniqueBlocks = [...new Set(blockNumbers)]
     const results = new Map<bigint, any>()
     
@@ -312,24 +302,14 @@ export class BlockchainService {
 
     // Get all unique pair addresses and block numbers
     const pairAddresses = [...new Set(logs.map(log => log.address))]
-    const blockNumbers = [...new Set(logs.map(log => log.blockNumber!))]
-    
+
     // Batch fetch pair information and blocks
-    const [pairInfoMap, blockMap] = await Promise.all([
-      this.batchGetPairInfo(pairAddresses),
-      this.batchGetBlocks(blockNumbers)
-    ])
+    const pairInfoMap = await this.batchGetPairInfo(pairAddresses);
 
     const swapEvents: SwapEvent[] = []
 
     for (const log of logs) {
       try {
-        const block = blockMap.get(log.blockNumber!)
-        if (!block) {
-          console.error(`No block found for ${log.blockNumber}`)
-          continue
-        }
-        
         const pairAddress = log.address
         const pairInfo = pairInfoMap.get(pairAddress)
         if (!pairInfo) {
@@ -355,7 +335,6 @@ export class BlockchainService {
           amount0Out: decodedLog.args.amount0Out,
           amount1Out: decodedLog.args.amount1Out,
           blockNumber: log.blockNumber!,
-          timestamp: BigInt(block.timestamp),
           transaction: { id: log.transactionHash },
           pair: {
             id: pairAddress,
@@ -410,26 +389,13 @@ export class BlockchainService {
       ...mintLogs.map(log => log.address),
       ...burnLogs.map(log => log.address)
     ])]
-    const allBlockNumbers = [...new Set([
-      ...mintLogs.map(log => log.blockNumber!),
-      ...burnLogs.map(log => log.blockNumber!)
-    ])]
     
     // Batch fetch pair information and blocks
-    const [pairInfoMap, blockMap] = await Promise.all([
-      this.batchGetPairInfo(allPairAddresses),
-      this.batchGetBlocks(allBlockNumbers)
-    ])
+    const pairInfoMap = await this.batchGetPairInfo(allPairAddresses);
 
     // Process mint events
     for (const log of mintLogs) {
       try {
-        const block = blockMap.get(log.blockNumber!)
-        if (!block) {
-          console.error(`No block found for ${log.blockNumber}`)
-          continue
-        }
-        
         const pairAddress = log.address
         const pairInfo = pairInfoMap.get(pairAddress)
         
@@ -454,7 +420,6 @@ export class BlockchainService {
           amount0: decodedLog.args.amount0,
           amount1: decodedLog.args.amount1,
           blockNumber: log.blockNumber!,
-          timestamp: BigInt(block.timestamp),
           transaction: { id: log.transactionHash },
           pair: {
             id: pairAddress,
@@ -470,12 +435,6 @@ export class BlockchainService {
     // Process burn events
     for (const log of burnLogs) {
       try {
-        const block = blockMap.get(log.blockNumber!)
-        if (!block) {
-          console.error(`No block found for ${log.blockNumber}`)
-          continue
-        }
-        
         const pairAddress = log.address
         const pairInfo = pairInfoMap.get(pairAddress)
         
@@ -501,7 +460,6 @@ export class BlockchainService {
           amount0: decodedLog.args.amount0,
           amount1: decodedLog.args.amount1,
           blockNumber: log.blockNumber!,
-          timestamp: BigInt(block.timestamp),
           transaction: { id: log.transactionHash },
           pair: {
             id: pairAddress,

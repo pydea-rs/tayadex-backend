@@ -18,12 +18,12 @@ async function fetchPools() {
 }
 
 export async function getPools(context: AppContext): Promise<IPairTokenData[]> {
-  const cachedPools = CacheService.getInstance().get(POOLS_CACHE_KEY);
+  const cachedPools = CacheService.getStore().get(POOLS_CACHE_KEY);
 
   const pools = cachedPools ? JSON.parse(cachedPools) : await fetchPools();
 
   if (!cachedPools) {
-    CacheService.getInstance().put(POOLS_CACHE_KEY, JSON.stringify(pools), {
+    CacheService.getStore().put(POOLS_CACHE_KEY, JSON.stringify(pools), {
       expirationTtl: POOLS_CACHE,
     });
   }

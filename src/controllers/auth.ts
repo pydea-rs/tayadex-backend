@@ -28,7 +28,7 @@ const AuthResponseSchema = z.object({
 });
 
 export class GetNonceRoute extends OpenAPIRoute {
-    private readonly cacheService = CacheService.getInstance();
+    private readonly cacheService = CacheService.getStore();
 
     schema = {
         request: {
@@ -83,7 +83,7 @@ export class GetNonceRoute extends OpenAPIRoute {
 }
 
 export class Web3LoginRoute extends OpenAPIRoute {
-    private readonly cacheService = CacheService.getInstance();
+    private readonly cacheService = CacheService.getStore();
     private readonly userService = UserService.get();
     private readonly referralService = ReferralService.get();
 
