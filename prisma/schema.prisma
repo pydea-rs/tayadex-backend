@@ -47,13 +47,13 @@ enum TransactionType {
 }
 
 model Chain {
-  id                   Int                    @id
-  name                 String
-  rpc                  String
-  lastIndexedBlock     BigInt?                @map("last_indexed_block")
-  createdAt            DateTime               @default(now()) @map("created_at")
-  updatedAt            DateTime?              @map("updated_at")
-  transactions ProcessedTransaction[]
+  id               Int                    @id
+  name             String
+  rpc              String
+  lastIndexedBlock BigInt?                @map("last_indexed_block")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime?              @map("updated_at")
+  transactions     ProcessedTransaction[]
 }
 
 model ProcessedTransaction {
@@ -70,10 +70,12 @@ model ProcessedTransaction {
   createdAt    DateTime        @default(now()) @map("created_at")
   processedAt  DateTime?       @map("processed_at")
 
-  userId        Int?           @map("user_id")
-  user          User?          @relation(fields: [userId], references: [id])
-  chainId       Int            @map("chain_id")
-  chain         Chain          @relation(fields: [chainId], references: [id])
+  userId   Int?  @map("user_id")
+  user     User? @relation(fields: [userId], references: [id])
+  chainId  Int   @map("chain_id")
+  chain    Chain @relation(fields: [chainId], references: [id])
+  metadata Json?
+
   relatedPoints PointHistory[]
 }
 
@@ -95,18 +97,28 @@ model PointSystemRule {
   pointHistory    PointHistory[]
 }
 
+enum PointSources {
+  TRANSACTION
+  DIRECT_REFERRAL
+  INDIRECT_REFERRAL
+  ACTIVISION_REFERRAL
+  ACTIVITY // offchain activity like twitter or whatever.
+}
+
 model PointHistory {
   id        BigInt    @id @default(autoincrement())
   amount    Float
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime? @map("updated_at")
 
-  ruleId        Int
-  rule          PointSystemRule       @relation(fields: [ruleId], references: [id])
+  source        PointSources          @default(TRANSACTION) @map("source")
+  ruleId        Int?
+  rule          PointSystemRule?      @relation(fields: [ruleId], references: [id])
   transactionId BigInt?               @map("trx_id")
   transaction   ProcessedTransaction? @relation(fields: [transactionId], references: [id])
   userId        Int?                  @map("user_id")
   user          User?                 @relation(fields: [userId], references: [id])
+  metadata      Json?
 }
 
 model Referral {

@@ -1,4 +1,5 @@
 import {
+    PointSources,
     PointSystemRule,
     PointSystemRuleType,
     ProcessedTransaction,
@@ -76,6 +77,7 @@ export class PointService {
         }
         return 0;
     }
+
     async update(user: User, trx: ProcessedTransaction) {
         const generalRule = await this.getGeneralRule(trx.type);
         if (generalRule) {
@@ -86,6 +88,7 @@ export class PointService {
                     ruleId: generalRule.id,
                     userId: user.id,
                     transactionId: trx.id,
+                    source: PointSources.TRANSACTION,
                 },
             });
         }
@@ -107,6 +110,7 @@ export class PointService {
                         ruleId: rule.id,
                         userId: user.id,
                         transactionId: trx.id,
+                        source: PointSources.TRANSACTION,
                     },
                 });
             })
