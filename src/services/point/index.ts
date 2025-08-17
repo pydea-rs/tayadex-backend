@@ -3,10 +3,12 @@ import {
     PointSystemRule,
     PointSystemRuleType,
     ProcessedTransaction,
+    ReferralRules,
     TransactionType,
     User,
 } from "@prisma/client";
 import { prisma } from "../prisma";
+import { approximate } from "@/utils";
 
 export class PointService {
     private static singleInstance: PointService;
@@ -115,6 +117,31 @@ export class PointService {
                 });
             })
         );
+    }
+
+    giveReferralPoint(
+        links: { referrer: User, referees: number[] }, 
+        rules: ReferralRules, 
+        direct: boolean, 
+        refereesEfforts: number, 
+        extraData: Record<string, unknown>
+    ) {
+        const [actualReward, pointSource] = direct ? 
+            [refereesEfforts * rules.directRewardRatio, PointSources.DIRECT_REFERRAL] 
+            : [refereesEfforts * rules.indirectRewardRatio, PointSources.INDIRECT_REFERRAL];
+
+        return prisma.pointHistory.create({ data: {
+            amount: approximate(actualReward, "ceil", 2),
+            source: pointSource,
+            userId: links.referrer.id,
+            metadata: {
+                refereesEfforts,
+                referralRulesId: rules.id,
+                fromDate: rules.lastPaymentAt,
+                referees: links.referees,
+                ...extraData
+            }
+        } })
     }
 
     getHistory({

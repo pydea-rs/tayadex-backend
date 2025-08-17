@@ -1,6 +1,6 @@
 import { PointService, prisma } from "@/services";
 import { approximate } from "@/utils";
-import { ReferralCriteriaModes, ReferralRewardType, ReferralRules, User } from "@prisma/client";
+import { PointSources, ReferralCriteriaModes, ReferralRewardType, ReferralRules, User } from "@prisma/client";
 
 export class ReferralService {
     private static singleInstance: ReferralService;
@@ -375,15 +375,9 @@ export class ReferralService {
             { bypassLayerEffect: direct }
         );
 
-        const [actualReward, rewardType] = direct ? 
-            [refereesEfforts * rules.directRewardRatio, rules.directRewardType] 
-            : [refereesEfforts * rules.indirectRewardRatio, rules.indirectRewardType];
-
-        const reward = approximate(actualReward, "ceil", 2);
-        
-        switch(rewardType) {
+        switch(direct ? rules.directRewardType : rules.indirectRewardType) {
             case ReferralRewardType.POINT:
-                // TODO:
+                await this.pointService.giveReferralPoint(links, rules, direct, refereesEfforts, { untilDate });
                 break;
             case ReferralRewardType.MON:
                 // TODO:

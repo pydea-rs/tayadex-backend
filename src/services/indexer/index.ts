@@ -4,6 +4,7 @@ import { BlockchainService, type SwapEvent, type LiquidityEvent } from "../block
 import { evaluateTokenData, TokensNumericalData } from "@/utils";
 import { UserService } from "../user";
 import { prisma } from "../prisma";
+import { InputJsonValue, JsonValue } from "@prisma/client/runtime/library";
 
 export class EventIndexer {
   private static singleInstance: EventIndexer;
@@ -89,7 +90,7 @@ export class EventIndexer {
                   amount: swap.amount1In - swap.amount1Out,
                 },
               ],
-              swap.to
+              swap.to,
             );
 
             if (!alreadyProcessed) {
@@ -253,7 +254,8 @@ export class EventIndexer {
     eventType: string | TransactionType,
     blockNumber: bigint,
     tokensData: TokensNumericalData[],
-    to: string
+    to: string,
+    metadata?: InputJsonValue
   ) {
     const tx = await prisma.processedTransaction.findFirst({
       where: { hash: txHash, type: eventType as TransactionType },
@@ -278,6 +280,7 @@ export class EventIndexer {
           processedAt: new Date(),
           userId: user?.id,
           chainId: this.blockchainService.defaultChain.id,
+          metadata: metadata,
         },
       });
       return { tx: newTx, user, alreadyProcessed: false };
@@ -295,7 +298,7 @@ export class EventIndexer {
     processedTx.token1 = tokens[1].symbol;
     processedTx.token1Amount = tokens[1].amount;
     await prisma.processedTransaction.update({
-      data: processedTx,
+      data: { ...processedTx, metadata: metadata ?? (processedTx.metadata as InputJsonValue) },
       where: { id: tx.id },
     });
 
