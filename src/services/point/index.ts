@@ -139,6 +139,7 @@ export class PointService {
                 referralRulesId: rules.id,
                 fromDate: rules.lastPaymentAt,
                 referees: links.referees,
+                actualReward,
                 ...extraData
             }
         } })

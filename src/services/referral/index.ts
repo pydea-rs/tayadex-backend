@@ -1,6 +1,12 @@
 import { PointService, prisma } from "@/services";
 import { approximate } from "@/utils";
-import { PointSources, ReferralCriteriaModes, ReferralRewardType, ReferralRules, User } from "@prisma/client";
+import {
+    PointSources,
+    ReferralCriteriaModes,
+    ReferralRewardType,
+    ReferralRules,
+    User,
+} from "@prisma/client";
 
 export class ReferralService {
     private static singleInstance: ReferralService;
@@ -375,85 +381,104 @@ export class ReferralService {
             { bypassLayerEffect: direct }
         );
 
-        switch(direct ? rules.directRewardType : rules.indirectRewardType) {
+        switch (direct ? rules.directRewardType : rules.indirectRewardType) {
             case ReferralRewardType.POINT:
-                await this.pointService.giveReferralPoint(links, rules, direct, refereesEfforts, { untilDate });
+                await this.pointService.giveReferralPoint(
+                    links,
+                    rules,
+                    direct,
+                    refereesEfforts,
+                    { untilDate }
+                );
                 break;
             case ReferralRewardType.MON:
-                // TODO:
+            // TODO:
             default:
-                throw new Error('Not implemented yet!');
+                throw new Error("Not implemented yet!");
         }
     }
 
-    async distributeReferrals(rules: ReferralRules) {
+    async distributeReferrals() {
         const until = new Date();
+        // TODO: Make the lastPaymentAt field per user; So if one user's payment failed at one round, it would be paid at next round at least.
+        const [directLinks, indirectLinks, allRules] = await Promise.all([
+            this.organizeReferralRelationsByReferrer({
+                layer: 0,
+            }),
+            this.organizeReferralRelationsByReferrer({
+                layer: { gt: 0 },
+            }),
+            prisma.referralRules.findMany({
+                where: { lastPaymentAt: { lt: until } },
+            }),
+        ]);
 
-        let referrers = await this.organizeReferralRelationsByReferrer({
-            layer: 0,
-        });
-
-        if (rules.directRewardRatio > 0) {
-            for (const referrerId in referrers) {
-                const { referrer, referees } = referrers[referrerId];
-                this.rewardUserByRule(
-                    referrers[referrerId],
-                    rules,
-                    until,
-                    true
-                ).catch((ex) => {
-                    console.error(
-                        "Failed to pay user referrals direct share.",
-                        ex as Error,
-                        {
-                            data: {
-                                referees,
-                                referrerId: referrer.id,
-                                trewardTypeype: rules.directRewardType,
-                                ratio: rules.directRewardRatio,
-                                type: "Direct",
-                            },
+        for (const rules of allRules) {
+            if (rules.directRewardRatio > 0) {
+                await Promise.all(
+                    Object.values(directLinks).map(async (link) => {
+                        try {
+                            await this.rewardUserByRule(
+                                link,
+                                rules,
+                                until,
+                                true
+                            );
+                        } catch (ex) {
+                            console.error(
+                                "Failed to pay user referrals direct share.",
+                                ex as Error,
+                                {
+                                    data: {
+                                        referees: link?.referees,
+                                        referrerId: link?.referrer.id,
+                                        trewardTypeype: rules.directRewardType,
+                                        ratio: rules.directRewardRatio,
+                                        type: "Direct",
+                                    },
+                                }
+                            );
                         }
-                    );
-                });
-            }
-        }
-        if (!rules.indirectRewardRatio) {
-            return;
-        }
-
-        referrers = await this.organizeReferralRelationsByReferrer({
-            layer: { gt: 0 },
-        });
-
-        for (const referrerId in referrers) {
-            const { referrer, referees } = referrers[referrerId];
-            this.rewardUserByRule(
-                referrers[referrerId],
-                rules,
-                until,
-                false
-            ).catch((ex) => {
-                console.error(
-                    "Failed to pay user referrals indirect share.",
-                    ex as Error,
-                    {
-                        data: {
-                            referees,
-                            referrerId: referrer.id,
-                            rewardType: rules.indirectRewardType,
-                            ratio: rules.indirectRewardRatio,
-                            type: "Indirect",
-                        },
-                    }
+                    })
                 );
+            }
+
+            if (rules.indirectRewardRatio) {
+                await Promise.all(
+                    Object.values(indirectLinks).map(async (link) => {
+                        try {
+                            await this.rewardUserByRule(
+                                link,
+                                rules,
+                                until,
+                                false
+                            );
+                        } catch (ex) {
+                            console.error(
+                                "Failed to pay user referrals indirect share.",
+                                ex as Error,
+                                {
+                                    data: {
+                                        referees: link.referees,
+                                        referrerId: link.referrer.id,
+                                        rewardType: rules.indirectRewardType,
+                                        ratio: rules.indirectRewardRatio,
+                                        type: "Indirect",
+                                    },
+                                }
+                            );
+                        }
+                    })
+                );
+            }
+
+            rules.lastPaymentAt = until;
+            await prisma.referralRules.update({
+                where: { id: rules.id },
+                data: rules,
             });
         }
 
-        rules.lastPaymentAt = until;
-        await prisma.referralRules.update({
-            where: { id: rules.id },
-            data: rules,
-        });
+        console.debug(`All referrals rewards until ${until.toLocaleString()} were distributed successfully.`);
     }
 }
