@@ -1,4 +1,4 @@
-import { IPairTokenMinimalData, IPairTokenSufficientData, ITransactionMinimalData } from "./common";
+import type { IPairTokenMinimalData, IPairTokenSufficientData, ITransactionMinimalData } from "./common";
 import { tayaswapSubpgrah } from "./constants";
 import { GET_USER_SWAPS } from "./queries";
 

@@ -3,7 +3,7 @@ import { monadTestnet } from 'viem/chains'
 import { getConfig, type BlockchainConfig } from './config'
 import { ethers } from 'ethers'
 import { prisma } from "../prisma";
-import { Chain } from '@prisma/client';
+import type { Chain } from '@prisma/client';
 
 // ABI for parsing events
 const PAIR_ABI = parseAbi([

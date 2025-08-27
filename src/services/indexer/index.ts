@@ -1,10 +1,10 @@
-import { ProcessedTransaction, TransactionType, User } from "@prisma/client";
+import { type ProcessedTransaction, TransactionType, type User } from "@prisma/client";
 import { PointService } from "../point";
-import { BlockchainService, type SwapEvent, type LiquidityEvent } from "../blockchain";
-import { evaluateTokenData, TokensNumericalData } from "@/utils";
+import { BlockchainService, } from "../blockchain";
+import { evaluateTokenData, type TokensNumericalData } from "@/utils";
 import { UserService } from "../user";
 import { prisma } from "../prisma";
-import { InputJsonValue, JsonValue } from "@prisma/client/runtime/library";
+import type { InputJsonValue, } from "@prisma/client/runtime/library";
 
 export class EventIndexer {
   private static singleInstance: EventIndexer;
@@ -12,7 +12,7 @@ export class EventIndexer {
   private readonly pointService = PointService.get();
   private readonly userService = UserService.get();
 
-  private alreadyListening: boolean = false;
+  private alreadyListening = false;
 
   static get() {
     if (EventIndexer.singleInstance) {
@@ -60,8 +60,8 @@ export class EventIndexer {
     let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 5253609n;
 
     // Process blocks in batches to avoid overwhelming the RPC
-    const batchSize = BigInt(this.blockchainService["config"].batchSize);
-    const maxBatchSteps = this.blockchainService["config"].maxBatchSteps ?? 100;
+    const batchSize = BigInt(this.blockchainService.config.batchSize);
+    const maxBatchSteps = this.blockchainService.config.maxBatchSteps ?? 100;
     let fromBlock = lastSuccessfullyIndexedBlock + 1n;
     
     for (let step = 0; fromBlock <= untilBlock && step < maxBatchSteps; step++) {
@@ -119,8 +119,8 @@ export class EventIndexer {
   public async checkoutLiquidityEvents(untilBlock: bigint) {
     let lastSuccessfullyIndexedBlock = this.blockchainService.defaultChain.lastIndexedBlock ?? 5253609n;
 
-    const batchSize = BigInt(this.blockchainService["config"].batchSize);
-    const maxBatchSteps = this.blockchainService["config"].maxBatchSteps ?? 100;
+    const batchSize = BigInt(this.blockchainService.config.batchSize);
+    const maxBatchSteps = this.blockchainService.config.maxBatchSteps ?? 100;
     let fromBlock = lastSuccessfullyIndexedBlock + 1n;
     
     for (let step = 0; fromBlock <= untilBlock && step < maxBatchSteps; step++) {

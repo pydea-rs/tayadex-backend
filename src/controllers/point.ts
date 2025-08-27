@@ -1,7 +1,7 @@
 import { PointHistorySchema } from "@/models";
 import { PaginationWithOrderSchema } from "@/models/common";
 import { PointService } from "@/services";
-import { AppContext } from "@/types";
+import type { AppContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 

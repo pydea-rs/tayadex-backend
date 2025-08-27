@@ -1,11 +1,9 @@
 import { PointService, prisma } from "@/services";
-import { approximate } from "@/utils";
 import {
-    PointSources,
     ReferralCriteriaModes,
     ReferralRewardType,
-    ReferralRules,
-    User,
+    type ReferralRules,
+    type User,
 } from "@prisma/client";
 
 export class ReferralService {
@@ -24,6 +22,7 @@ export class ReferralService {
             ReferralService.singleInstance;
         }
     }
+
     async findUserByReferralCode(code: string) {
         return prisma.user.findFirst({
             where: { referralCode: code },
@@ -32,7 +31,7 @@ export class ReferralService {
 
     async validateUserAllowanceToSetReferrerCode(
         user: User,
-        checkDate: boolean = false
+        checkDate = false
     ) {
         if (checkDate) {
             // In case this is called from some endpoint other than register!
@@ -83,7 +82,7 @@ export class ReferralService {
         });
     }
 
-    async findReferrer(userId: number, shouldThrow: boolean = false) {
+    async findReferrer(userId: number, shouldThrow = false) {
         const referral = await prisma.referral.findFirst({
             where: { userId, layer: 0 },
             include: { referrer: true },
@@ -159,12 +158,12 @@ export class ReferralService {
     }
 
     async generateNewCode() {
-        const codeLength = 8, // TODO: Use configService
-            containsAlpha = true; // TODO:
+        const codeLength = 8; // TODO: Use configService
+        const containsAlpha = true; // TODO:
 
         const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const characters =
-            (containsAlpha ? alpha : "") + "01234567890123456789";
+            `${containsAlpha ? alpha : ""}01234567890123456789`;
 
         let code: string;
         do {
@@ -188,8 +187,8 @@ export class ReferralService {
                 userId,
                 { direct: true },
                 paginationOptions
-            ),
-            indirectReferralReports = await this.findReferees(
+            );
+        const indirectReferralReports = await this.findReferees(
                 userId,
                 { direct: false },
                 paginationOptions
@@ -207,7 +206,7 @@ export class ReferralService {
     async linkUserToReferrers(
         user: User,
         referrerCode: string,
-        shouldThrow: boolean = true
+        shouldThrow = true
     ) {
         referrerCode = referrerCode.toUpperCase();
 
@@ -330,7 +329,7 @@ export class ReferralService {
                             ${extraCondition}
                     `;
                     return results?.[0]?.totalPoints ?? 0;
-                } else {
+                }
                     const inPsqlArray =
                         referees.length > 1
                             ? `ANY(ARRAY[${referees.join(", ")}])`
@@ -351,7 +350,6 @@ export class ReferralService {
                             ${extraCondition}
                     `;
                     return results?.[0]?.totalPoints ?? 0;
-                }
             }
             case ReferralCriteriaModes.TRANSACTIONS:
             // TODO:
@@ -371,7 +369,7 @@ export class ReferralService {
         },
         rules: ReferralRules,
         untilDate: Date = new Date(),
-        direct: boolean = true
+        direct = true
     ) {
         const refereesEfforts = await this.calculateRefereesEfforts(
             links.referrer.id,
@@ -391,7 +389,6 @@ export class ReferralService {
                     { untilDate }
                 );
                 break;
-            case ReferralRewardType.MON:
             // TODO:
             default:
                 throw new Error("Not implemented yet!");

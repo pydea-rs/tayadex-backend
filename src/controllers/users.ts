@@ -9,7 +9,7 @@ import {
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { UserService } from "@/services/user";
-import { type AuthContext } from "@/middleware/auth";
+import type { AuthContext } from "@/middleware/auth";
 
 export class GetUsersRoute extends OpenAPIRoute {
     private userService = UserService.get();
@@ -189,7 +189,7 @@ export class GetProfileRoute extends OpenAPIRoute {
 
     async handle(ctx: AuthContext) {
         const user = { ...ctx.user };
-        delete user.updatedAt;
+        user.updatedAt = undefined;
         return user;
     }
 }

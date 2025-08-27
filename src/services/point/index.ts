@@ -1,11 +1,11 @@
 import {
     PointSources,
-    PointSystemRule,
+    type PointSystemRule,
     PointSystemRuleType,
-    ProcessedTransaction,
-    ReferralRules,
+    type ProcessedTransaction,
+    type ReferralRules,
     TransactionType,
-    User,
+    type User,
 } from "@prisma/client";
 import { prisma } from "../prisma";
 import { approximate } from "@/utils";
@@ -59,16 +59,17 @@ export class PointService {
     calculatePoint(trx: ProcessedTransaction, rule: PointSystemRule) {
         // TODO: Formula used here (esp. min and burn) is a test formula; It needs to be finalized.
         switch (rule.transactionType) {
-            case TransactionType.SWAP:
+            case TransactionType.SWAP: {
                 const [inAmount, outAmount] =
                     trx.token0Amount < 0
                         ? [trx.token1Amount ?? 0, -trx.token0Amount]
                         : [trx.token0Amount, -(trx.token1Amount ?? 0)];
                 const point =
                     rule.baseValue + rule.relativeValue / inAmount / outAmount;
-                if (!isNaN(point)) {
+                if (!Number.isNaN(point)) {
                     return point;
                 }
+            }
             case TransactionType.MINT:
             case TransactionType.BURN:
                 return (

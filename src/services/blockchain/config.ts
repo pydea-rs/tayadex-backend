@@ -22,10 +22,10 @@ export const getConfig = (): BlockchainConfig => {
   return {
     ...DEFAULT_CONFIG,
     rpcUrl: process.env.RPC_URL || DEFAULT_CONFIG.rpcUrl,
-    chainId: parseInt(process.env.CHAIN_ID || DEFAULT_CONFIG.chainId.toString()),
+    chainId: Number.parseInt(process.env.CHAIN_ID || DEFAULT_CONFIG.chainId.toString()),
     factoryAddress: process.env.FACTORY_ADDRESS || DEFAULT_CONFIG.factoryAddress,
-    batchSize: parseInt(process.env.BATCH_SIZE || DEFAULT_CONFIG.batchSize.toString()),
-    maxRetries: parseInt(process.env.MAX_RETRIES || DEFAULT_CONFIG.maxRetries.toString()),
-    retryDelay: parseInt(process.env.RETRY_DELAY || DEFAULT_CONFIG.retryDelay.toString()),
+    batchSize: Number.parseInt(process.env.BATCH_SIZE || DEFAULT_CONFIG.batchSize.toString()),
+    maxRetries: Number.parseInt(process.env.MAX_RETRIES || DEFAULT_CONFIG.maxRetries.toString()),
+    retryDelay: Number.parseInt(process.env.RETRY_DELAY || DEFAULT_CONFIG.retryDelay.toString()),
   }
 } 

@@ -1,7 +1,7 @@
 import type { AppContext } from "@/types";
 import { GET_POOLS_QUERY } from "./queries";
 import { POOLS_CACHE, POOLS_CACHE_KEY, tayaswapSubpgrah } from "./constants";
-import { IPairTokenData } from "./common";
+import type { IPairTokenData } from "./common";
 import { CacheService } from "../cache";
 
 interface IPoolsResponse {

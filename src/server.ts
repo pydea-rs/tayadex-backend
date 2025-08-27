@@ -3,7 +3,7 @@ import cron from 'node-cron'
 import { CacheService, EventIndexer } from '@/services'
 import app from './app'
 
-const port = parseInt(process.env.PORT || '3000', 10)
+const port = Number.parseInt(process.env.PORT || '3000', 10)
 
 const eventIndexerService = EventIndexer.get()
 

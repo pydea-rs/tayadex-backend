@@ -1,6 +1,5 @@
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
-import { prisma } from "@/services/prisma";
 import {
     generateNonce,
     generateAuthMessage,
@@ -8,10 +7,9 @@ import {
     generateToken,
     Web3AuthSchema,
 } from "@/utils/auth";
-import { type AppContext } from "@/types";
+import type { AppContext } from "@/types";
 import { CacheService, ReferralService } from "@/services";
 import { UserService } from "@/services/user";
-import { error } from "console";
 
 const GetNonceSchema = z.object({
     address: z.string().min(42).max(42).describe("Ethereum wallet address"),

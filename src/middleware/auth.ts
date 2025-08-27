@@ -1,7 +1,7 @@
-import { Context, Next } from "hono";
+import type { Context, Next } from "hono";
 import { extractToken, verifyToken } from "../utils/auth";
 import { prisma } from "../services/prisma";
-import { Avatar, User } from "@prisma/client";
+import type { Avatar, User } from "@prisma/client";
 
 export interface AuthContext extends Context {
     user?: User & {

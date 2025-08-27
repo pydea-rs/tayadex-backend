@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "init": "node prisma/seed.db.js",
     "build": "tsc",
     "format": "biome format --max-diagnostics 100 --write ./",
     "lint": "biome lint --write --unsafe --max-diagnostics 100 ./"

@@ -1,7 +1,7 @@
-import { User } from "@prisma/client";
+import type { User } from "@prisma/client";
 import { prisma } from "../prisma";
 import { ReferralService } from "../referral";
-import { Address, getAddress, isAddress } from "viem";
+import { getAddress, isAddress } from "viem";
 
 export class UserService {
     private static singleInstance: UserService;
@@ -28,7 +28,7 @@ export class UserService {
         }: { publicDataOnly?: boolean; throwIfNotFound?: boolean } = {}
     ) {
         const isWalletAddress = isAddress(ident);
-        if (isNaN(+ident) && !isWalletAddress) {
+        if (Number.isNaN(+ident) && !isWalletAddress) {
             throw new Error("Invalid user Id or wallet address!");
         }
         const user = await prisma.user.findUnique({
