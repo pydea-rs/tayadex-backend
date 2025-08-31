@@ -22,20 +22,21 @@ model Avatar {
 }
 
 model User {
-  id           Int                    @id @default(autoincrement())
-  name         String?
-  email        String?                @unique
-  address      String                 @unique
-  referralCode String                 @unique
-  avatarId     Int?                   @map("avatar_id")
-  avatar       Avatar?                @relation(fields: [avatarId], references: [id])
-  createdAt    DateTime               @default(now()) @map("created_at")
-  updatedAt    DateTime               @updatedAt @map("updated_at")
-  transactions ProcessedTransaction[]
-  pointHistory PointHistory[]
-  isAdmin      Boolean                @default(false) @map("is_admin")
-  referrers    Referral[]             @relation("ReferrerUser")
-  referrees    Referral[]             @relation("RefereeUser")
+  id                 Int                    @id @default(autoincrement())
+  name               String?
+  email              String?                @unique
+  address            String                 @unique
+  referralCode       String                 @unique
+  avatarId           Int?                   @map("avatar_id")
+  avatar             Avatar?                @relation(fields: [avatarId], references: [id])
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  transactions       ProcessedTransaction[]
+  pointHistory       PointHistory[]
+  isAdmin            Boolean                @default(false) @map("is_admin")
+  referrers          Referral[]             @relation("ReferrerUser")
+  referrees          Referral[]             @relation("RefereeUser")
+  achievedMilestones AchievedMilestones[]
 }
 
 enum TransactionType {
@@ -144,7 +145,7 @@ enum ReferralCriteriaModes {
   MINTS_ONLY
 }
 
-enum ReferralRewardType {
+enum RewardTypesEnum {
   POINT
   MON
   // Other types or tokens
@@ -157,11 +158,42 @@ model ReferralRules {
   criteria             ReferralCriteriaModes @default(POINTS) @map("criteria")
   criteriaToken        String?               @map("criteria_token") // In case basis is not POINTS
   activisionReward     Float                 @default(0) @map("activision_reward") // Amount which goes to both referee and referrer right after linking
-  activisionRewardType ReferralRewardType    @default(POINT) @map("activision_reward_type")
+  activisionRewardType RewardTypesEnum       @default(POINT) @map("activision_reward_type")
   directRewardRatio    Float                 @default(0.1) @map("direct_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
-  directRewardType     ReferralRewardType    @default(POINT) @map("direct_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
+  directRewardType     RewardTypesEnum       @default(POINT) @map("direct_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by direct referees
   indirectRewardRatio  Float                 @default(0.01) @map("indirect_referral_ratio") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
-  indirectRewardType   ReferralRewardType    @default(POINT) @map("indirect_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
+  indirectRewardType   RewardTypesEnum       @default(POINT) @map("indirect_referral_type") // Specifying the percentage goes to referrer based on sum of amount gained by indirect referees
   devidByLayer         Boolean               @default(false) @map("devide_by_layer") // Affect referral layer in rewards amount, deviding the final reward on (layer + 1)
   lastPaymentAt        DateTime?             @map("last_payment_at")
+}
+
+enum MilestoneTypes {
+  POINT
+  TOKEN
+  LIKE
+  COMMENT
+  POST
+}
+
+model Milestone {
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  type       MilestoneTypes       @default(POINT)
+  argument   String? // extra parameter such as token type
+  value      Float? // main paraneter such as point reach point
+  reward     Float
+  rewardType RewardTypesEnum      @default(POINT) @map("reward_type")
+  achievers  AchievedMilestones[]
+}
+
+model AchievedMilestones {
+  milestoneId Int       @map("milestone_id")
+  milestone   Milestone @relation(fields: [milestoneId], references: [id])
+  userId      Int       @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@id([milestoneId, userId])
 }
