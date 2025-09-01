@@ -71,22 +71,22 @@ interface PairInfo {
 export class BlockchainService {
   private static instance: BlockchainService
   private client: ReturnType<typeof createPublicClient>
-  private config: BlockchainConfig
+  private _config: BlockchainConfig
   private tokenCache: Map<string, TokenInfo> = new Map()
   private pairCache: Map<string, PairInfo> = new Map()
   private _defaultChain: Chain | null = null;
 
   private constructor() {
-    this.config = getConfig()
+    this._config = getConfig()
     this.client = createPublicClient({
       chain: monadTestnet,
-      transport: http(this.config.rpcUrl),
+      transport: http(this._config.rpcUrl),
     })
     this.init().catch(err => console.error('Initialing BlockchainService failed: ', err));
   }
 
   async init() {
-    this._defaultChain = await prisma.chain.findFirst({where: { id: this.config.chainId }})
+    this._defaultChain = await prisma.chain.findFirst({where: { id: this._config.chainId }})
     if(!this._defaultChain) {
       throw new Error('Failed loading chain; Indexer will not work correctly.')
     }
@@ -98,6 +98,10 @@ export class BlockchainService {
       throw new Error('Failed loading default chain; Indexer will not work correctly; try again later.')
     }
     return this._defaultChain;
+  }
+
+  get config(): BlockchainConfig {
+    return this._config;
   }
 
   async updateLastIndexedBlock(blockNumber: bigint) {
@@ -121,15 +125,15 @@ export class BlockchainService {
   async withRetry<T>(operation: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null
     
-    for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
+    for (let attempt = 1; attempt <= this._config.maxRetries; attempt++) {
       try {
         return await operation()
       } catch (error) {
         lastError = error as Error
         console.warn(`Attempt ${attempt} failed:`, error)
         
-        if (attempt < this.config.maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, this.config.retryDelay))
+        if (attempt < this._config.maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, this._config.retryDelay))
         }
       }
     }
@@ -198,7 +202,7 @@ export class BlockchainService {
     const results = new Map<string, PairInfo>()
     
     // Process in batches to avoid overwhelming the RPC
-    const batchSize = Math.min(10, this.config.batchSize * 2) // Use config batch size but cap at 10
+    const batchSize = Math.min(10, this._config.batchSize * 2) // Use config batch size but cap at 10
     for (let i = 0; i < uniqueAddresses.length; i += batchSize) {
       const batch = uniqueAddresses.slice(i, i + batchSize)
       const batchPromises = batch.map(async (address) => {
@@ -220,7 +224,7 @@ export class BlockchainService {
       
       // Add delay between batches to avoid rate limiting
       if (i + batchSize < uniqueAddresses.length) {
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay / 2))
+        await new Promise(resolve => setTimeout(resolve, this._config.retryDelay / 2))
       }
     }
     
@@ -232,7 +236,7 @@ export class BlockchainService {
     const results = new Map<bigint, any>()
     
     // Process in batches to avoid overwhelming the RPC
-    const batchSize = Math.min(5, this.config.batchSize)
+    const batchSize = Math.min(5, this._config.batchSize)
     for (let i = 0; i < uniqueBlocks.length; i += batchSize) {
       const batch = uniqueBlocks.slice(i, i + batchSize)
       const batchPromises = batch.map(async (blockNumber) => {
@@ -254,7 +258,7 @@ export class BlockchainService {
       
       // Add delay between batches to avoid rate limiting
       if (i + batchSize < uniqueBlocks.length) {
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay / 2))
+        await new Promise(resolve => setTimeout(resolve, this._config.retryDelay / 2))
       }
     }
     

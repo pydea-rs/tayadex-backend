@@ -26,8 +26,15 @@ async function main() {
                     data: {
                         id,
                         rpc: providerUrl,
-                        lastIndexedBlock: 5253609n,
                         name,
+                        ...(process.env.START_FROM_BLOCK?.trim().length &&
+                        +process.env.START_FROM_BLOCK >= 0
+                            ? {
+                                  lastIndexedBlock: BigInt(
+                                      process.env.START_FROM_BLOCK
+                                  ),
+                              }
+                            : {}),
                     },
                 })
             )
