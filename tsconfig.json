@@ -1,23 +1,26 @@
 {
   "compilerOptions": {
     "target": "es2021",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "lib": ["es2021"],
+    "jsx": "react-jsx",
+    "module": "es2022",
     "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": false,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": true,
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": "./",
     "outDir": "./dist",
-    "rootDir": "src",
     "paths": {
       "@/*": ["src/*"] // enables us to use @components/MyComponent
     }
   },
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"],
+  "exclude": ["test"],
   "include": ["src/**/*.ts"]
 }

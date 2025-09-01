@@ -49,10 +49,8 @@ export class EventIndexer {
             const currentBlockNumber =
                 await this.blockchainService.getLatestBlockNumber();
             this.lock();
-            const [lastSwapBlock, lastMintBurnBlock] = await Promise.all([
-                this.checkoutSwapEvents(currentBlockNumber),
-                this.checkoutLiquidityEvents(currentBlockNumber),
-            ]);
+            const lastSwapBlock = await this.checkoutSwapEvents(currentBlockNumber); 
+            const lastMintBurnBlock = await this.checkoutLiquidityEvents(currentBlockNumber);
             this.unlock();
             await this.blockchainService.updateLastIndexedBlock(
                 lastSwapBlock < lastMintBurnBlock

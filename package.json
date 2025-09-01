@@ -6,7 +6,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "init": "node prisma/seed.db.js",
-    "build": "tsc",
+    "build": "tsup src/server.ts --format esm --out-dir dist --splitting --clean --dts",
     "format": "biome format --max-diagnostics 100 --write ./",
     "lint": "biome lint --write --unsafe --max-diagnostics 100 ./"
   },
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "22.13.10",
+    "tsup": "^8.5.0",
     "typescript": "5.8.2"
   }
 }
