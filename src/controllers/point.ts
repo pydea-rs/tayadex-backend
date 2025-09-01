@@ -57,10 +57,10 @@ export class GetPointHistoryRoute extends OpenAPIRoute {
         ).map((point) => ({
             ...point,
             id: point.id.toString(),
-            transactionId: point.transactionId.toString(),
+            transactionId: point.transactionId?.toString(),
             transaction: {
                 ...point.transaction,
-                id: point.transactionId.toString(),
+                id: point.transactionId?.toString(),
             },
         }));
     }
