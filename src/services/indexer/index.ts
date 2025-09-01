@@ -9,7 +9,7 @@ import { evaluateTokenData, type TokensNumericalData } from "@/utils";
 import { UserService } from "../user";
 import { prisma } from "../prisma";
 import type { InputJsonValue } from "@prisma/client/runtime/library";
-import Queue from "mnemonist/queue";
+import { Queue } from "mnemonist";
 import {
     type TransactionProcessorPayloadType,
     type TransactionQueueElement,
