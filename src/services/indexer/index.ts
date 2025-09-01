@@ -9,9 +9,16 @@ import { evaluateTokenData, type TokensNumericalData } from "@/utils";
 import { UserService } from "../user";
 import { prisma } from "../prisma";
 import type { InputJsonValue } from "@prisma/client/runtime/library";
+import Queue from "mnemonist/queue";
+import {
+    type TransactionProcessorPayloadType,
+    type TransactionQueueElement,
+} from "./types";
+import cron from "node-cron";
 
 export class EventIndexer {
     private static singleInstance: EventIndexer;
+    private trxQueue = new Queue<TransactionQueueElement>();
     private readonly blockchainService: BlockchainService =
         BlockchainService.get();
     private readonly pointService = PointService.get();
@@ -29,6 +36,24 @@ export class EventIndexer {
     private constructor() {
         if (EventIndexer.singleInstance) {
             return EventIndexer.singleInstance; // Double check re-instanciation block.
+        } else {
+            // Schedule the cron job to run every 10 seconds
+            cron.schedule("* * * * * *", async () => {
+                for (let i = 0; i < 2; i++) {
+                    this.processTransactionQueue().catch((error) => {
+                        console.error(
+                            "Failed processing this round of transaction queue:",
+                            error
+                        );
+                    });
+                    if (!i) {
+                        // cron does not support less than second intervals, so i run the queue processor two times with 500 ms offsets.
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, 500)
+                        );
+                    }
+                }
+            });
         }
     }
 
@@ -96,31 +121,24 @@ export class EventIndexer {
 
                 for (const swap of swaps) {
                     try {
-                        const { tx, user, alreadyProcessed } =
-                            await this.markTransactionProcessed(
-                                swap.transaction.id,
-                                TransactionType.SWAP,
-                                swap.blockNumber,
-                                [
-                                    {
-                                        symbol: swap.pair.token0.symbol,
-                                        decimals: swap.pair.token0.decimals,
-                                        amount:
-                                            swap.amount0In - swap.amount0Out,
-                                    },
-                                    {
-                                        symbol: swap.pair.token1.symbol,
-                                        decimals: swap.pair.token1.decimals,
-                                        amount:
-                                            swap.amount1In - swap.amount1Out,
-                                    },
-                                ],
-                                swap.to
-                            );
-
-                        if (!alreadyProcessed) {
-                            await this.processNewSwapEvent(tx, user);
-                        }
+                        this.enqueuNewTransaction(
+                            swap.transaction.id,
+                            TransactionType.SWAP,
+                            swap.blockNumber,
+                            [
+                                {
+                                    symbol: swap.pair.token0.symbol,
+                                    decimals: swap.pair.token0.decimals,
+                                    amount: swap.amount0In - swap.amount0Out,
+                                },
+                                {
+                                    symbol: swap.pair.token1.symbol,
+                                    decimals: swap.pair.token1.decimals,
+                                    amount: swap.amount1In - swap.amount1Out,
+                                },
+                            ],
+                            swap.to
+                        );
                     } catch (error) {
                         console.error(
                             `Error processing swap ${swap.id}:`,
@@ -177,29 +195,24 @@ export class EventIndexer {
 
                 for (const mint of mints) {
                     try {
-                        const { tx, user, alreadyProcessed } =
-                            await this.markTransactionProcessed(
-                                mint.transaction.id,
-                                TransactionType.MINT,
-                                mint.blockNumber,
-                                [
-                                    {
-                                        symbol: mint.pair.token0.symbol,
-                                        decimals: mint.pair.token0.decimals,
-                                        amount: mint.amount0,
-                                    },
-                                    {
-                                        symbol: mint.pair.token1.symbol,
-                                        decimals: mint.pair.token1.decimals,
-                                        amount: mint.amount1,
-                                    },
-                                ],
-                                mint.to
-                            );
-
-                        if (!alreadyProcessed) {
-                            await this.processNewLiquidityEvent(tx, user);
-                        }
+                        this.enqueuNewTransaction(
+                            mint.transaction.id,
+                            TransactionType.MINT,
+                            mint.blockNumber,
+                            [
+                                {
+                                    symbol: mint.pair.token0.symbol,
+                                    decimals: mint.pair.token0.decimals,
+                                    amount: mint.amount0,
+                                },
+                                {
+                                    symbol: mint.pair.token1.symbol,
+                                    decimals: mint.pair.token1.decimals,
+                                    amount: mint.amount1,
+                                },
+                            ],
+                            mint.to
+                        );
                     } catch (error) {
                         // FIXME: In case one event log wasnt processed, how we can inform indexer about that?
                         // TODO/SOLUTION: Hmm. Maybe push failed tx Hashes to an array and try them later?!
@@ -212,29 +225,24 @@ export class EventIndexer {
 
                 for (const burn of burns) {
                     try {
-                        const { tx, user, alreadyProcessed } =
-                            await this.markTransactionProcessed(
-                                burn.transaction.id,
-                                TransactionType.BURN,
-                                burn.blockNumber,
-                                [
-                                    {
-                                        symbol: burn.pair.token0.symbol,
-                                        decimals: burn.pair.token0.decimals,
-                                        amount: -burn.amount0, // Negative for burn events
-                                    },
-                                    {
-                                        symbol: burn.pair.token1.symbol,
-                                        decimals: burn.pair.token1.decimals,
-                                        amount: -burn.amount1, // Negative for burn events
-                                    },
-                                ],
-                                burn.to
-                            );
-
-                        if (!alreadyProcessed) {
-                            await this.processNewLiquidityEvent(tx, user);
-                        }
+                        this.enqueuNewTransaction(
+                            burn.transaction.id,
+                            TransactionType.BURN,
+                            burn.blockNumber,
+                            [
+                                {
+                                    symbol: burn.pair.token0.symbol,
+                                    decimals: burn.pair.token0.decimals,
+                                    amount: -burn.amount0, // Negative for burn events
+                                },
+                                {
+                                    symbol: burn.pair.token1.symbol,
+                                    decimals: burn.pair.token1.decimals,
+                                    amount: -burn.amount1, // Negative for burn events
+                                },
+                            ],
+                            burn.to
+                        );
                     } catch (error) {
                         console.error(
                             `Error processing burn ${burn.id}:`,
@@ -308,7 +316,7 @@ export class EventIndexer {
         );
     }
 
-    async markTransactionProcessed(
+    enqueuNewTransaction(
         txHash: string,
         eventType: string | TransactionType,
         blockNumber: bigint,
@@ -316,6 +324,27 @@ export class EventIndexer {
         to: string,
         metadata?: InputJsonValue
     ) {
+        this.trxQueue.enqueue({
+            payload: {
+                txHash,
+                eventType,
+                blockNumber,
+                tokensData,
+                to,
+                metadata,
+            },
+            retries: 0,
+        });
+    }
+
+    async markTransactionProcessed({
+        txHash,
+        eventType,
+        blockNumber,
+        tokensData,
+        to,
+        metadata = undefined,
+    }: TransactionProcessorPayloadType) {
         const tx = await prisma.processedTransaction.findFirst({
             where: { hash: txHash, type: eventType as TransactionType },
             include: { user: true },
@@ -368,5 +397,45 @@ export class EventIndexer {
         });
 
         return { tx, user, alreadyProcessed: false };
+    }
+
+    async processTransactionQueue() {
+        try {
+            const { payload, retries } = this.trxQueue.dequeue() ?? {
+                payload: undefined,
+                retries: 0,
+            };
+            if (!payload) {
+                return;
+            }
+            try {
+                const { tx, user, alreadyProcessed } =
+                    await this.markTransactionProcessed(payload);
+
+                if (!alreadyProcessed) {
+                    switch (tx.type) {
+                        case TransactionType.SWAP:
+                            await this.processNewSwapEvent(tx, user);
+                            break;
+                        case TransactionType.BURN:
+                        case TransactionType.MINT:
+                            await this.processNewLiquidityEvent(tx, user);
+                            break;
+                    }
+                }
+            } catch (ex) {
+                console.error(
+                    `Failed processing ${payload.eventType} event:`,
+                    ex
+                );
+                if (payload && retries < 3)
+                    this.trxQueue.enqueue({ payload, retries: retries + 1 }); // enqueue for reprocess.
+            }
+        } catch (ex) {
+            if (!this.trxQueue.peek()) {
+                return;
+            }
+            console.error("Processing transaction in queue failed!", ex);
+        }
     }
 }

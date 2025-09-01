@@ -228,6 +228,73 @@ export class BlockchainService {
         return pairInfo;
     }
 
+    async getPairInfoWithMulticall(
+        pairAddresses: string[]
+    ): Promise<Map<string, PairInfo>> {
+        const multicallArgs = pairAddresses
+            .map((address) => [
+                {
+                    address: address as Address,
+                    abi: PAIR_ABI,
+                    functionName: "token0",
+                },
+                {
+                    address: address as Address,
+                    abi: PAIR_ABI,
+                    functionName: "token1",
+                },
+            ])
+            .flat();
+
+        const tokenAddresses = (
+            await this.client.multicall({
+                contracts: multicallArgs,
+            })
+        ).map(({ result }) => result as Address);
+
+        const tokenMulticallArgs = tokenAddresses
+            .map((address) => [
+                {
+                    address,
+                    abi: ERC20_ABI,
+                    functionName: "symbol",
+                },
+                {
+                    address,
+                    abi: ERC20_ABI,
+                    functionName: "decimals",
+                },
+            ])
+            .flat();
+
+        const tokenInfos = (
+            await this.client.multicall({
+                contracts: tokenMulticallArgs,
+            })
+        ).map(({ result }) => ({ result }));
+
+        const results = new Map<string, PairInfo>();
+
+        for (
+            let i = 0, iOffset = 0;
+            i < pairAddresses.length;
+            i++, iOffset = i * 4
+        ) {
+            results.set(pairAddresses[i], {
+                token0: {
+                    symbol: tokenInfos[iOffset]?.toString(),
+                    decimals: +tokenInfos[iOffset + 1],
+                },
+                token1: {
+                    symbol: tokenInfos[iOffset + 2]?.toString(),
+                    decimals: +tokenInfos[iOffset + 3],
+                },
+            });
+        }
+
+        return results;
+    }
+
     async batchGetPairInfo(
         pairAddresses: string[]
     ): Promise<Map<string, PairInfo>> {
@@ -389,7 +456,7 @@ export class BlockchainService {
         const pairAddresses = [...new Set(logs.map((log) => log.address))];
 
         // Batch fetch pair information and blocks
-        const pairInfoMap = await this.batchGetPairInfo(pairAddresses);
+        const pairInfoMap = await this.getPairInfoWithMulticall(pairAddresses);
 
         const swapEvents: SwapEvent[] = [];
 
@@ -488,7 +555,7 @@ export class BlockchainService {
         ];
 
         // Batch fetch pair information and blocks
-        const pairInfoMap = await this.batchGetPairInfo(allPairAddresses);
+        const pairInfoMap = await this.getPairInfoWithMulticall(allPairAddresses);
 
         // Process mint events
         for (const log of mintLogs) {

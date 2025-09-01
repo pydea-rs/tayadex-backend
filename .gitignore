@@ -172,3 +172,4 @@ dist
 .wrangler/
 /generated/prisma
 AUTH_README.md
+secrets

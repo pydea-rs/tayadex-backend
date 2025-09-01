@@ -21,6 +21,7 @@
     "graphql-request": "7.1.2",
     "hono": "4.7.4",
     "jsonwebtoken": "^9.0.2",
+    "mnemonist": "^0.40.3",
     "node-cron": "^4.1.0",
     "prisma": "^6.8.2",
     "tsx": "^4.19.2",
