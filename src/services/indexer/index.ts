@@ -49,8 +49,12 @@ export class EventIndexer {
             const currentBlockNumber =
                 await this.blockchainService.getLatestBlockNumber();
             this.lock();
-            const lastSwapBlock = await this.checkoutSwapEvents(currentBlockNumber); 
-            const lastMintBurnBlock = await this.checkoutLiquidityEvents(currentBlockNumber);
+            const lastSwapBlock = await this.checkoutSwapEvents(
+                currentBlockNumber
+            );
+            const lastMintBurnBlock = await this.checkoutLiquidityEvents(
+                currentBlockNumber
+            );
             this.unlock();
             await this.blockchainService.updateLastIndexedBlock(
                 lastSwapBlock < lastMintBurnBlock
@@ -90,44 +94,40 @@ export class EventIndexer {
                     toBlock
                 );
 
-                await Promise.all(
-                    swaps.map(async (swap) => {
-                        try {
-                            const { tx, user, alreadyProcessed } =
-                                await this.markTransactionProcessed(
-                                    swap.transaction.id,
-                                    TransactionType.SWAP,
-                                    swap.blockNumber,
-                                    [
-                                        {
-                                            symbol: swap.pair.token0.symbol,
-                                            decimals: swap.pair.token0.decimals,
-                                            amount:
-                                                swap.amount0In -
-                                                swap.amount0Out,
-                                        },
-                                        {
-                                            symbol: swap.pair.token1.symbol,
-                                            decimals: swap.pair.token1.decimals,
-                                            amount:
-                                                swap.amount1In -
-                                                swap.amount1Out,
-                                        },
-                                    ],
-                                    swap.to
-                                );
-
-                            if (!alreadyProcessed) {
-                                await this.processNewSwapEvent(tx, user);
-                            }
-                        } catch (error) {
-                            console.error(
-                                `Error processing swap ${swap.id}:`,
-                                error
+                for (const swap of swaps) {
+                    try {
+                        const { tx, user, alreadyProcessed } =
+                            await this.markTransactionProcessed(
+                                swap.transaction.id,
+                                TransactionType.SWAP,
+                                swap.blockNumber,
+                                [
+                                    {
+                                        symbol: swap.pair.token0.symbol,
+                                        decimals: swap.pair.token0.decimals,
+                                        amount:
+                                            swap.amount0In - swap.amount0Out,
+                                    },
+                                    {
+                                        symbol: swap.pair.token1.symbol,
+                                        decimals: swap.pair.token1.decimals,
+                                        amount:
+                                            swap.amount1In - swap.amount1Out,
+                                    },
+                                ],
+                                swap.to
                             );
+
+                        if (!alreadyProcessed) {
+                            await this.processNewSwapEvent(tx, user);
                         }
-                    })
-                );
+                    } catch (error) {
+                        console.error(
+                            `Error processing swap ${swap.id}:`,
+                            error
+                        );
+                    }
+                }
                 lastSuccessfullyIndexedBlock = toBlock;
             } catch (error) {
                 console.error(
@@ -175,77 +175,73 @@ export class EventIndexer {
                         toBlock
                     );
 
-                await Promise.all(
-                    mints.map(async (mint) => {
-                        try {
-                            const { tx, user, alreadyProcessed } =
-                                await this.markTransactionProcessed(
-                                    mint.transaction.id,
-                                    TransactionType.MINT,
-                                    mint.blockNumber,
-                                    [
-                                        {
-                                            symbol: mint.pair.token0.symbol,
-                                            decimals: mint.pair.token0.decimals,
-                                            amount: mint.amount0,
-                                        },
-                                        {
-                                            symbol: mint.pair.token1.symbol,
-                                            decimals: mint.pair.token1.decimals,
-                                            amount: mint.amount1,
-                                        },
-                                    ],
-                                    mint.to
-                                );
-
-                            if (!alreadyProcessed) {
-                                await this.processNewLiquidityEvent(tx, user);
-                            }
-                        } catch (error) {
-                            // FIXME: In case one event log wasnt processed, how we can inform indexer about that?
-                            // TODO/SOLUTION: Hmm. Maybe push failed tx Hashes to an array and try them later?!
-                            console.error(
-                                `Error processing mint ${mint.id}:`,
-                                error
+                for (const mint of mints) {
+                    try {
+                        const { tx, user, alreadyProcessed } =
+                            await this.markTransactionProcessed(
+                                mint.transaction.id,
+                                TransactionType.MINT,
+                                mint.blockNumber,
+                                [
+                                    {
+                                        symbol: mint.pair.token0.symbol,
+                                        decimals: mint.pair.token0.decimals,
+                                        amount: mint.amount0,
+                                    },
+                                    {
+                                        symbol: mint.pair.token1.symbol,
+                                        decimals: mint.pair.token1.decimals,
+                                        amount: mint.amount1,
+                                    },
+                                ],
+                                mint.to
                             );
+
+                        if (!alreadyProcessed) {
+                            await this.processNewLiquidityEvent(tx, user);
                         }
-                    })
-                );
+                    } catch (error) {
+                        // FIXME: In case one event log wasnt processed, how we can inform indexer about that?
+                        // TODO/SOLUTION: Hmm. Maybe push failed tx Hashes to an array and try them later?!
+                        console.error(
+                            `Error processing mint ${mint.id}:`,
+                            error
+                        );
+                    }
+                }
 
-                await Promise.all(
-                    burns.map(async (burn) => {
-                        try {
-                            const { tx, user, alreadyProcessed } =
-                                await this.markTransactionProcessed(
-                                    burn.transaction.id,
-                                    TransactionType.BURN,
-                                    burn.blockNumber,
-                                    [
-                                        {
-                                            symbol: burn.pair.token0.symbol,
-                                            decimals: burn.pair.token0.decimals,
-                                            amount: -burn.amount0, // Negative for burn events
-                                        },
-                                        {
-                                            symbol: burn.pair.token1.symbol,
-                                            decimals: burn.pair.token1.decimals,
-                                            amount: -burn.amount1, // Negative for burn events
-                                        },
-                                    ],
-                                    burn.to
-                                );
-
-                            if (!alreadyProcessed) {
-                                await this.processNewLiquidityEvent(tx, user);
-                            }
-                        } catch (error) {
-                            console.error(
-                                `Error processing burn ${burn.id}:`,
-                                error
+                for (const burn of burns) {
+                    try {
+                        const { tx, user, alreadyProcessed } =
+                            await this.markTransactionProcessed(
+                                burn.transaction.id,
+                                TransactionType.BURN,
+                                burn.blockNumber,
+                                [
+                                    {
+                                        symbol: burn.pair.token0.symbol,
+                                        decimals: burn.pair.token0.decimals,
+                                        amount: -burn.amount0, // Negative for burn events
+                                    },
+                                    {
+                                        symbol: burn.pair.token1.symbol,
+                                        decimals: burn.pair.token1.decimals,
+                                        amount: -burn.amount1, // Negative for burn events
+                                    },
+                                ],
+                                burn.to
                             );
+
+                        if (!alreadyProcessed) {
+                            await this.processNewLiquidityEvent(tx, user);
                         }
-                    })
-                );
+                    } catch (error) {
+                        console.error(
+                            `Error processing burn ${burn.id}:`,
+                            error
+                        );
+                    }
+                }
 
                 lastSuccessfullyIndexedBlock = toBlock;
             } catch (error) {
