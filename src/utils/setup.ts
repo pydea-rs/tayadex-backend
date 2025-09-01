@@ -10,7 +10,7 @@ export const app = new Hono();
 app.use("/*", cors());
 
 export const openapi = fromHono(app, {
-    docs_url: "/",
+    docs_url: "/api",
 });
 
 export type GuardOptions = {
