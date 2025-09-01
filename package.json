@@ -16,6 +16,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "chanfana": "2.6.3",
     "decimal.js": "^10.5.0",
+    "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "graphql-request": "7.1.2",
     "hono": "4.7.4",

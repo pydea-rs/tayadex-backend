@@ -7,6 +7,10 @@ import {
     TransactionType,
 } from "@prisma/client";
 
+import { config } from "dotenv";
+
+config();
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -17,9 +21,9 @@ async function main() {
                 {
                     id: 10143,
                     name: "Monad Testnet",
-                    providerUrl: "https://testnet-rpc.monad.xyz",
+                    providerUrl:
+                        process.env.RPC_URL || "https://testnet-rpc.monad.xyz",
                     blockProcessRange: 50,
-                    acceptedBlockStatus: "latest",
                 },
             ].map(async ({ id, name, providerUrl }) =>
                 prisma.chain.create({
@@ -27,11 +31,11 @@ async function main() {
                         id,
                         rpc: providerUrl,
                         name,
-                        ...(process.env.START_FROM_BLOCK?.trim().length &&
-                        +process.env.START_FROM_BLOCK >= 0
+                        ...(process.env.START_BLOCK?.trim().length &&
+                        +process.env.START_BLOCK >= 0
                             ? {
                                   lastIndexedBlock: BigInt(
-                                      process.env.START_FROM_BLOCK
+                                      process.env.START_BLOCK
                                   ),
                               }
                             : {}),

@@ -47,9 +47,9 @@ export const getConfig = (): BlockchainConfig => {
                     DEFAULT_CONFIG.retryDelay.toString()
             ) * 1000,
         startFromBlock:
-            process.env.START_FROM_BLOCK?.trim().length &&
-            +process.env.START_FROM_BLOCK >= 0
-                ? BigInt(process.env.START_FROM_BLOCK)
+            process.env.START_BLOCK?.trim().length &&
+            +process.env.START_BLOCK >= 0
+                ? BigInt(process.env.START_BLOCK)
                 : DEFAULT_CONFIG.startFromBlock,
     };
 };
