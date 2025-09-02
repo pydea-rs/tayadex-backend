@@ -475,7 +475,7 @@ export class BlockchainService {
         ];
 
         // Batch fetch pair information and blocks
-        const pairInfoMap = await this.getPairInfoWithMulticall(pairAddresses);
+        const pairInfoMap = await this.batchGetPairInfo(pairAddresses);
 
         const swapEvents: SwapEvent[] = [];
 
@@ -483,7 +483,7 @@ export class BlockchainService {
             try {
                 const pairAddress = log.address;
                 const pairInfo =
-                    this.pairCache.get(pairAddress) ??
+                    // this.pairCache.get(pairAddress) ??
                     pairInfoMap.get(pairAddress);
                 if (!pairInfo) {
                     console.error(`No pair info found for ${pairAddress}`);
@@ -578,9 +578,7 @@ export class BlockchainService {
         ];
 
         // Batch fetch pair information and blocks
-        const pairInfoMap = await this.getPairInfoWithMulticall(
-            allPairAddresses
-        );
+        const pairInfoMap = await this.batchGetPairInfo(allPairAddresses);
 
         // Process mint events
 
@@ -588,7 +586,7 @@ export class BlockchainService {
             try {
                 const pairAddress = log.address;
                 const pairInfo =
-                    this.pairCache.get(pairAddress) ??
+                    // this.pairCache.get(pairAddress) ??
                     pairInfoMap.get(pairAddress);
 
                 if (!pairInfo) {
