@@ -8,7 +8,7 @@ const port = Number.parseInt(process.env.PORT || '3000', 10)
 const eventIndexerService = EventIndexer.get()
 
 // Schedule the cron job to run every 10 seconds
-cron.schedule('*/10 * * * * *', () => {
+cron.schedule('*/30 * * * * *', () => {
   eventIndexerService.listen().catch(error => {
     console.error('Event indexer failed:', error)
   })

@@ -38,21 +38,13 @@ export class EventIndexer {
             return EventIndexer.singleInstance; // Double check re-instanciation block.
         } else {
             // Schedule the cron job to run every 10 seconds
-            cron.schedule("* * * * * *", async () => {
-                for (let i = 0; i < 2; i++) {
-                    this.processTransactionQueue().catch((error) => {
-                        console.error(
-                            "Failed processing this round of transaction queue:",
-                            error
-                        );
-                    });
-                    if (!i) {
-                        // cron does not support less than second intervals, so i run the queue processor two times with 500 ms offsets.
-                        await new Promise((resolve) =>
-                            setTimeout(resolve, 500)
-                        );
-                    }
-                }
+            cron.schedule("* * * * * *", () => {
+                this.processTransactionQueue().catch((error) => {
+                    console.error(
+                        "Failed processing this round of transaction queue:",
+                        error
+                    );
+                });
             });
         }
     }
