@@ -20,9 +20,9 @@ export const Web3AuthSchema = z.object({
   address: z.string().min(42).max(42),
   signature: z.string(),
   message: z.string(),
-  email: z.string().email().nullable(),
-  name: z.string().nullable(),
-  referralCode: z.string().nullable(),
+  email: z.string().email().optional().nullable(),
+  name: z.string().optional().nullable(),
+  referralCode: z.string().optional().nullable(),
 });
 
 export type Web3AuthData = z.infer<typeof Web3AuthSchema>;

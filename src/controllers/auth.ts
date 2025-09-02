@@ -20,8 +20,8 @@ const AuthResponseSchema = z.object({
     user: z.object({
         id: z.number(),
         address: z.string(),
-        name: z.string().nullable(),
-        email: z.string().nullable(),
+        name: z.string().optional().nullable(),
+        email: z.string().optional().nullable(),
     }),
 });
 

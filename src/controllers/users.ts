@@ -204,9 +204,9 @@ export class PatchUserRoute extends OpenAPIRoute {
                 content: {
                     "application/json": {
                         schema: z.object({
-                            email: z.string().email().nullable(),
-                            name: z.string().nullable(),
-                            referralCode: z.string().nullable(),
+                            email: z.string().email().optional().nullable(),
+                            name: z.string().optional().nullable(),
+                            referralCode: z.string().optional().nullable(),
                         }),
                     },
                 },
