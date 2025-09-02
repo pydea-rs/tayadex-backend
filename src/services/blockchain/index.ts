@@ -231,6 +231,11 @@ export class BlockchainService {
     async getPairInfoWithMulticall(
         pairAddresses: string[]
     ): Promise<Map<string, PairInfo>> {
+        const results = new Map<string, PairInfo>();
+
+        if (!pairAddresses?.length) {
+            return results;
+        }
         const multicallArgs = pairAddresses
             .map((address) => [
                 {
@@ -273,14 +278,12 @@ export class BlockchainService {
             })
         ).map(({ result }) => ({ result }));
 
-        const results = new Map<string, PairInfo>();
-
         for (
             let i = 0, iOffset = 0;
             i < pairAddresses.length;
             i++, iOffset = i * 4
         ) {
-            results.set(pairAddresses[i], {
+            const ti = {
                 token0: {
                     symbol: tokenInfos[iOffset]?.toString(),
                     decimals: +tokenInfos[iOffset + 1],
@@ -289,7 +292,9 @@ export class BlockchainService {
                     symbol: tokenInfos[iOffset + 2]?.toString(),
                     decimals: +tokenInfos[iOffset + 3],
                 },
-            });
+            };
+            results.set(pairAddresses[i], ti);
+            this.pairCache.set(pairAddresses[i], ti);
         }
 
         return results;
@@ -453,7 +458,13 @@ export class BlockchainService {
         }
 
         // Get all unique pair addresses and block numbers
-        const pairAddresses = [...new Set(logs.map((log) => log.address))];
+        const pairAddresses = [
+            ...new Set(
+                logs
+                    .filter((l) => !this.pairCache.has(l.address))
+                    .map((log) => log.address)
+            ),
+        ];
 
         // Batch fetch pair information and blocks
         const pairInfoMap = await this.getPairInfoWithMulticall(pairAddresses);
@@ -463,7 +474,9 @@ export class BlockchainService {
         for (const log of logs) {
             try {
                 const pairAddress = log.address;
-                const pairInfo = pairInfoMap.get(pairAddress);
+                const pairInfo =
+                    this.pairCache.get(pairAddress) ??
+                    pairInfoMap.get(pairAddress);
                 if (!pairInfo) {
                     console.error(`No pair info found for ${pairAddress}`);
                     continue;
@@ -548,20 +561,27 @@ export class BlockchainService {
 
         // Get all unique pair addresses and block numbers from both mint and burn logs
         const allPairAddresses = [
-            ...new Set([
-                ...mintLogs.map((log) => log.address),
-                ...burnLogs.map((log) => log.address),
-            ]),
+            ...new Set(
+                [
+                    ...mintLogs.map((log) => log.address),
+                    ...burnLogs.map((log) => log.address),
+                ].filter((l) => !this.pairCache.has(l))
+            ),
         ];
 
         // Batch fetch pair information and blocks
-        const pairInfoMap = await this.getPairInfoWithMulticall(allPairAddresses);
+        const pairInfoMap = await this.getPairInfoWithMulticall(
+            allPairAddresses
+        );
 
         // Process mint events
+
         for (const log of mintLogs) {
             try {
                 const pairAddress = log.address;
-                const pairInfo = pairInfoMap.get(pairAddress);
+                const pairInfo =
+                    this.pairCache.get(pairAddress) ??
+                    pairInfoMap.get(pairAddress);
 
                 if (!pairInfo) {
                     console.error(`No pair info found for ${pairAddress}`);
