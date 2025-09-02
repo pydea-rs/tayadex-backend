@@ -395,6 +395,14 @@ export class BlockchainService {
         return this.withRetry(() => this.client.getBlockNumber());
     }
 
+    async getLastFinalizedBlockNumber(): Promise<bigint> {
+        return (
+            await this.withRetry(() =>
+                this.client.getBlock({ blockTag: "finalized" })
+            )
+        ).number;
+    }
+
     async getBlock(blockNumber: bigint) {
         return await this.withRetry(() =>
             this.client.getBlock({ blockNumber })

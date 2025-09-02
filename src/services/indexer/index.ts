@@ -63,14 +63,14 @@ export class EventIndexer {
         }
         console.log("Indexer next round started...");
         try {
-            const currentBlockNumber =
-                await this.blockchainService.getLatestBlockNumber();
+            const lastFinalizedBlockNumber =
+                await this.blockchainService.getLastFinalizedBlockNumber();
             this.lock();
             const lastSwapBlock = await this.checkoutSwapEvents(
-                currentBlockNumber
+                lastFinalizedBlockNumber
             );
             const lastMintBurnBlock = await this.checkoutLiquidityEvents(
-                currentBlockNumber
+                lastFinalizedBlockNumber
             );
             this.unlock();
             await this.blockchainService.updateLastIndexedBlock(
