@@ -161,6 +161,7 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
             transactionId: point.transactionId?.toString(),
             transaction: {
                 ...point.transaction,
+                blockNumber: point.transaction?.blockNumber?.toString(),
                 id: point.transactionId?.toString(),
             },
         }));

@@ -435,7 +435,7 @@ export class PointService {
     async getOnesRanking(userId: number) {
         const user = await prisma.$queryRaw<
             {
-                userId: string;
+                userId: number;
                 totalPoints: number;
                 referrals: number;
                 quests: number;
