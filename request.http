@@ -12,15 +12,15 @@ GET {{host}}/stats
 Content-Type: application/json
 
 ### get user ranking
-GET {{host}}/user/2359/point
+GET {{host}}/user/4426/financials
 Content-Type: application/json
 
 ### get leaderboard
-GET {{host}}/point/history?take=10&skip=0
+GET {{host}}/point?take=10&skip=10&sortBy=referrals
 Content-Type: application/json
 
 ### get point history
-GET {{host}}/point/history
+GET {{host}}/point/history?take=10
 Content-Type: application/json
 
 ### patch profile

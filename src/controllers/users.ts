@@ -116,7 +116,9 @@ export class GetUserPointRoute extends OpenAPIRoute {
             params: { id },
         } = await this.getValidatedData<typeof this.schema>();
 
-        return this.pointService.getOnesRanking(id);
+        const r = await this.pointService.getOnesRanking(id);
+        console.log(r);
+        return r;
     }
 }
 
