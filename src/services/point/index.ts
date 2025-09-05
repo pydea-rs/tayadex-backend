@@ -12,6 +12,18 @@ import { approximate } from "@/utils";
 
 export class PointService {
     private static singleInstance: PointService;
+    private readonly LEADERBOARD_BASE_QUERY = `SELECT 
+                ph."user_id" as "userId",
+                u.name as "userName",
+                u.address as "userAddress",
+                u.created_at as "userCreatedAt"
+                SUM(ph.amount) as "totalPoints",
+                SUM(CASE WHEN ph.source IN ('${PointSources.DIRECT_REFERRAL}', '${PointSources.INDIRECT_REFERRAL}') 
+                    THEN ph.amount ELSE 0 END) as "referrals",
+                SUM(CASE WHEN ph.source IN ('${PointSources.SOCIAL_ACTIVITY}', '${PointSources.ONCHAIN_ACTIVITY}') 
+                    THEN ph.amount ELSE 0 END) as "quests",
+            FROM "PointHistory" ph
+            LEFT JOIN "User" u ON ph."user_id" = u.id`;
 
     public static get() {
         if (PointService.singleInstance) {
@@ -121,29 +133,37 @@ export class PointService {
     }
 
     giveReferralPoint(
-        links: { referrer: User, referees: number[] }, 
-        rules: ReferralRules, 
-        direct: boolean, 
-        refereesEfforts: number, 
+        links: { referrer: User; referees: number[] },
+        rules: ReferralRules,
+        direct: boolean,
+        refereesEfforts: number,
         extraData: Record<string, unknown>
     ) {
-        const [actualReward, pointSource] = direct ? 
-            [refereesEfforts * rules.directRewardRatio, PointSources.DIRECT_REFERRAL] 
-            : [refereesEfforts * rules.indirectRewardRatio, PointSources.INDIRECT_REFERRAL];
+        const [actualReward, pointSource] = direct
+            ? [
+                  refereesEfforts * rules.directRewardRatio,
+                  PointSources.DIRECT_REFERRAL,
+              ]
+            : [
+                  refereesEfforts * rules.indirectRewardRatio,
+                  PointSources.INDIRECT_REFERRAL,
+              ];
 
-        return prisma.pointHistory.create({ data: {
-            amount: approximate(actualReward, "ceil", 2),
-            source: pointSource,
-            userId: links.referrer.id,
-            metadata: {
-                refereesEfforts,
-                referralRulesId: rules.id,
-                fromDate: rules.lastPaymentAt,
-                referees: links.referees,
-                actualReward,
-                ...extraData
-            }
-        } })
+        return prisma.pointHistory.create({
+            data: {
+                amount: approximate(actualReward, "ceil", 2),
+                source: pointSource,
+                userId: links.referrer.id,
+                metadata: {
+                    refereesEfforts,
+                    referralRulesId: rules.id,
+                    fromDate: rules.lastPaymentAt,
+                    referees: links.referees,
+                    actualReward,
+                    ...extraData,
+                },
+            },
+        });
     }
 
     getHistory({
@@ -187,26 +207,33 @@ export class PointService {
         return this.getHistory({ userId, ...paginationData });
     }
 
-    async getPointBoard() {
-        // Approach 1: Using raw query for better performance with user data
-        const results = await prisma.$queryRaw<{
-            userId: number;
-            totalPoints: number;
-            userName: string | null;
-            userAddress: string;
-            userCreatedAt: Date;
-        }[]>`
-            SELECT 
-                ph."user_id" as "userId",
-                SUM(ph.amount) as "totalPoints",
-                u.name as "userName",
-                u.address as "userAddress",
-                u.created_at as "userCreatedAt"
-            FROM "PointHistory" ph
-            LEFT JOIN "User" u ON ph."user_id" = u.id
+    async getPointBoard({
+        take = undefined,
+        skip = undefined,
+        descending = true,
+    }: { take?: number; skip?: number; descending?: boolean } = {}) {
+        let extraCommands = "";
+        if (take) {
+            extraCommands += ` LIMIT ${take}`;
+        }
+        if (skip) {
+            extraCommands += ` OFFSET ${skip}`;
+        }
+
+        const results = await prisma.$queryRaw<
+            {
+                userId: number;
+                totalPoints: number;
+                userName: string | null;
+                userAddress: string;
+                userCreatedAt: Date;
+            }[]
+        >`
+            ${this.LEADERBOARD_BASE_QUERY}
             WHERE ph."user_id" IS NOT NULL
             GROUP BY ph."user_id", u.name, u.address, u.created_at
-            ORDER BY "totalPoints" DESC
+            ORDER BY "totalPoints" ${descending ? "DESC" : "ASC"}
+            ${extraCommands}
         `;
         return results;
     }
@@ -225,7 +252,9 @@ export class PointService {
         });
 
         // Get user details for each userId
-        const userIds = pointSums.map(p => p.userId).filter(id => id !== null);
+        const userIds = pointSums
+            .map((p) => p.userId)
+            .filter((id) => id !== null);
         const users = await prisma.user.findMany({
             where: { id: { in: userIds } },
             select: {
@@ -234,11 +263,11 @@ export class PointService {
                 address: true,
                 createdAt: true,
                 // ...
-            }
+            },
         });
 
-        const userMap = new Map(users.map(user => [user.id, user]));
-        return pointSums.map(pointSum => ({
+        const userMap = new Map(users.map((user) => [user.id, user]));
+        return pointSums.map((pointSum) => ({
             userId: pointSum.userId,
             totalPoints: pointSum._sum.amount ?? 0,
             user: userMap.get(pointSum.userId!) ?? null,
@@ -256,7 +285,7 @@ export class PointService {
                         name: true,
                         address: true,
                         createdAt: true,
-                    }
+                    },
                 },
                 rule: {
                     select: {
@@ -265,7 +294,7 @@ export class PointService {
                         transactionType: true,
                         baseValue: true,
                         relativeValue: true,
-                    }
+                    },
                 },
                 transaction: {
                     select: {
@@ -275,30 +304,33 @@ export class PointService {
                         token0: true,
                         token1: true,
                         createdAt: true,
-                    }
-                }
+                    },
+                },
             },
-            orderBy: { createdAt: "desc" }
+            orderBy: { createdAt: "desc" },
         });
 
         // Group by user and calculate totals
-        const userPointsMap = new Map<number, {
-            user: any;
-            totalPoints: number;
-            pointEntries: any[];
-        }>();
+        const userPointsMap = new Map<
+            number,
+            {
+                user: any;
+                totalPoints: number;
+                pointEntries: any[];
+            }
+        >();
 
-        results.forEach(entry => {
+        results.forEach((entry) => {
             if (!entry.userId) return;
-            
+
             if (!userPointsMap.has(entry.userId)) {
                 userPointsMap.set(entry.userId, {
                     user: entry.user,
                     totalPoints: 0,
-                    pointEntries: []
+                    pointEntries: [],
                 });
             }
-            
+
             const userData = userPointsMap.get(entry.userId)!;
             userData.totalPoints += entry.amount;
             userData.pointEntries.push({
@@ -311,8 +343,9 @@ export class PointService {
         });
 
         // Convert to array and sort by total points
-        return Array.from(userPointsMap.values())
-            .sort((a, b) => b.totalPoints - a.totalPoints);
+        return Array.from(userPointsMap.values()).sort(
+            (a, b) => b.totalPoints - a.totalPoints
+        );
     }
 
     async getOnesPoint(userId: number) {

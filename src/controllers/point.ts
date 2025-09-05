@@ -7,7 +7,9 @@ import { z } from "zod";
 
 export class GetPointBoardRoute extends OpenAPIRoute {
     schema = {
-        request: {},
+        request: {
+            query: PaginationWithOrderSchema,
+        },
         responses: {
             200: {
                 description:
@@ -22,7 +24,8 @@ export class GetPointBoardRoute extends OpenAPIRoute {
     };
 
     async handle(ctx: AppContext) {
-        return PointService.get().getPointBoard();
+        const { query } = await this.getValidatedData<typeof this.schema>();
+        return PointService.get().getPointBoard(query);
     }
 }
 

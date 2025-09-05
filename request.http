@@ -10,11 +10,9 @@ POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-    "email": null,
-    "name": null,
-    "referralCode": null,
+
     "address": "0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363",
     "signature": "0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363",
-    "message": "Welcome to Tayadex!\n\nClick to sign in and accept the Tayadex Terms of Service.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet: 0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363\nNonce: yvcu1xdqp4ezv6wfhkkk4\nTimestamp: 2025-09-02T23:39:43.024Z"
-    
+    "message": "Welcome to Tayadex!\n\nClick to sign in and accept the Tayadex Terms of Service.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet: 0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363\nNonce: 0ek0teawhu1m8f5svzty8ai\nTimestamp: 2025-09-02T23:40:43.805Z"
+
 }
