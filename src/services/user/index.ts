@@ -18,6 +18,7 @@ export class UserService {
         if (UserService.singleInstance) {
             UserService.singleInstance;
         }
+        UserService.singleInstance = this;
     }
 
     async getProfile(

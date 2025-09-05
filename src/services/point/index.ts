@@ -37,6 +37,7 @@ export class PointService {
         if (PointService.singleInstance) {
             PointService.singleInstance;
         }
+        PointService.singleInstance = this;
     }
 
     getGeneralRule(transactionType: TransactionType) {

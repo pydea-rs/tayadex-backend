@@ -21,6 +21,7 @@ export class ReferralService {
         if (ReferralService.singleInstance) {
             ReferralService.singleInstance;
         }
+        ReferralService.singleInstance = this;
     }
 
     async findUserByReferralCode(code: string) {

@@ -47,6 +47,7 @@ export class EventIndexer {
                 });
             });
         }
+        EventIndexer.singleInstance = this;
     }
 
     lock() {
