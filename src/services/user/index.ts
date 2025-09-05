@@ -1,4 +1,4 @@
-import type { User } from "@prisma/client";
+import type { Avatar, User } from "@prisma/client";
 import { prisma } from "../prisma";
 import { ReferralService } from "../referral";
 import { getAddress, isAddress } from "viem";
@@ -90,8 +90,8 @@ export class UserService {
         return avatars[(Math.random() * avatars.length) | 0];
     }
 
-    updateUser(user: User) {
-        return prisma.user.update({ where: { id: user.id }, data: user });
+    updateUser({ id, avatar, ...user }: User & { avatar?: Avatar | null }) {
+        return prisma.user.update({ where: { id }, data: user });
     }
 
     async findOrCreateUserByAddress(

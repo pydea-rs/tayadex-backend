@@ -1,13 +1,7 @@
-import type { Context, Next } from "hono";
+import type { Next } from "hono";
 import { extractToken, verifyToken } from "../utils/auth";
 import { prisma } from "../services/prisma";
-import type { Avatar, User } from "@prisma/client";
-
-export interface AuthContext extends Context {
-    user?: User & {
-        avatar?: Avatar | null;
-    };
-}
+import type { AuthContext } from "@/types";
 
 export async function authMiddleware(c: AuthContext, next: Next) {
     try {
@@ -37,7 +31,6 @@ export async function authMiddleware(c: AuthContext, next: Next) {
         }
 
         c.set("user", user);
-
         await next();
     } catch (error) {
         console.error("Auth middleware error:", error);
@@ -67,7 +60,6 @@ export async function optionalAuthMiddleware(c: AuthContext, next: Next) {
                 }
             }
         }
-
         await next();
     } catch (error) {
         console.error("Optional auth middleware error:", error);

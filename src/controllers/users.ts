@@ -5,11 +5,11 @@ import {
     UserPrivateProfileDto,
     UserPublicProfileDto,
     type AppContext,
+    type AuthContext,
 } from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { UserService } from "@/services/user";
-import type { AuthContext } from "@/middleware/auth";
 
 export class GetUsersRoute extends OpenAPIRoute {
     private userService = UserService.get();
@@ -188,8 +188,7 @@ export class GetProfileRoute extends OpenAPIRoute {
     };
 
     async handle(ctx: AuthContext) {
-        const user = { ...ctx.user };
-        user.updatedAt = undefined;
+        const user = { ...ctx.var.user }; // returning a copy of the object for reassurance.
         return user;
     }
 }
@@ -249,7 +248,7 @@ export class PatchUserRoute extends OpenAPIRoute {
             body: { email = null, name = null, referralCode = null },
         } = await this.getValidatedData<typeof this.schema>();
 
-        const { user } = ctx;
+        const { user } = ctx.var;
         
         try {
             if(!user) {
