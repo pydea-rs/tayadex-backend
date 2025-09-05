@@ -31,4 +31,12 @@ export const LeaderboardRankingItemSchema = z.object({
     quests: z.number().describe("Sum of points gained by completing quests."),
 });
 
+export const LeaderboardRankingItemWithPositionSchema =
+    LeaderboardRankingItemSchema.extend({
+        position: z
+            .number()
+            .describe("User's position (ranking) in leaderboard"),
+    })
+        .nullable()
+        .describe("The ranking data of a specific user");
 export const LeaderboardTableSchema = z.array(LeaderboardRankingItemSchema);

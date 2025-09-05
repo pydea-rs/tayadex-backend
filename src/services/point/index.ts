@@ -236,7 +236,7 @@ export class PointService {
             GROUP BY ph."user_id", u.name, u.address, u.created_at
             ORDER BY "totalPoints" ${descending ? "DESC" : "ASC"}
             ${extraCommands}
-        `;
+        `; // TODO: Checkout if all these groupBy items are necessary (in this func and also getOnesRanking function)
         return results;
     }
 
@@ -416,19 +416,36 @@ export class PointService {
     }
 
     async getOnesRanking(userId: number) {
-        const results = await prisma.$queryRaw<
+        const user = await prisma.$queryRaw<
             {
-                userId: number;
+                userId: string;
                 totalPoints: number;
-                userName: string | null;
+                referrals: number;
+                quests: number;
+                userName: string;
                 userAddress: string;
                 userCreatedAt: Date;
+                position: number;
             }[]
-        >`
+        >`WITH user_totals AS (
             ${this.LEADERBOARD_BASE_QUERY}
-            WHERE ph."user_id" IS NOT NULL
+            WHERE ph."user_id" = ${userId}
             GROUP BY ph."user_id", u.name, u.address, u.created_at
-        `;
-        return results;
+        )
+        SELECT 
+            ut.*,
+            (
+                SELECT COUNT(*) 
+                FROM (
+                    SELECT ph2."user_id", SUM(ph2.amount) as totalPoints
+                    FROM "PointHistory" ph2
+                    GROUP BY ph2."user_id"
+                    HAVING SUM(ph2.amount) > ut."totalPoints"
+                ) higher
+            ) + 1 AS "position"
+        FROM user_totals ut;
+      `;
+
+        return user?.[0] ?? null;
     }
 }

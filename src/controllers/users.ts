@@ -1,4 +1,4 @@
-import { PointHistoryTableSchema, UserSchema } from "@/models";
+import { LeaderboardRankingItemWithPositionSchema, PointHistoryTableSchema, UserSchema } from "@/models";
 import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
 import { PointService, ReferralService } from "@/services";
 import {
@@ -90,7 +90,7 @@ export class GetUserPointRoute extends OpenAPIRoute {
                     "Get single user's point endpoint; Returns a value as point.",
                 content: {
                     "application/json": {
-                        schema: z.number(),
+                        schema: LeaderboardRankingItemWithPositionSchema,
                     },
                 },
             },
@@ -112,7 +112,7 @@ export class GetUserPointRoute extends OpenAPIRoute {
             params: { id },
         } = await this.getValidatedData<typeof this.schema>();
 
-        return this.pointService.getOnesPoint(id);
+        return this.pointService.getOnesRanking(id);
     }
 }
 
