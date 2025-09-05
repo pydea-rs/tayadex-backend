@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../prisma";
 import { approximate } from "@/utils";
+import { LeaderboardSortOptionsEnum } from "@/models";
 
 export class PointService {
     private static singleInstance: PointService;
@@ -210,8 +211,14 @@ export class PointService {
     async getPointBoard({
         take = undefined,
         skip = undefined,
+        sortBy = LeaderboardSortOptionsEnum.BY_TOTAL_POINT,
         descending = true,
-    }: { take?: number; skip?: number; descending?: boolean } = {}) {
+    }: {
+        take?: number;
+        skip?: number;
+        sortBy?: LeaderboardSortOptionsEnum;
+        descending?: boolean;
+    } = {}) {
         let extraCommands = "";
         if (take) {
             extraCommands += ` LIMIT ${take}`;
@@ -219,6 +226,11 @@ export class PointService {
         if (skip) {
             extraCommands += ` OFFSET ${skip}`;
         }
+
+        const orderBy =
+            sortBy !== LeaderboardSortOptionsEnum.BY_TOTAL_POINT
+                ? sortBy.toString()
+                : "totalPoints";
 
         const results = await prisma.$queryRaw<
             {
@@ -234,7 +246,7 @@ export class PointService {
             ${this.LEADERBOARD_BASE_QUERY}
             WHERE ph."user_id" IS NOT NULL
             GROUP BY ph."user_id", u.name, u.address, u.created_at
-            ORDER BY "totalPoints" ${descending ? "DESC" : "ASC"}
+            ORDER BY "${orderBy}" ${descending ? "DESC" : "ASC"}
             ${extraCommands}
         `; // TODO: Checkout if all these groupBy items are necessary (in this func and also getOnesRanking function)
         return results;

@@ -1,4 +1,4 @@
-import { PointHistoryTableSchema, LeaderboardTableSchema } from "@/models";
+import { PointHistoryTableSchema, LeaderboardTableSchema, GetLeaderboardQuerySchema } from "@/models";
 import { PaginationWithOrderSchema } from "@/models/common";
 import { PointService } from "@/services";
 import type { AppContext } from "@/types";
@@ -7,7 +7,7 @@ import { OpenAPIRoute } from "chanfana";
 export class GetPointBoardRoute extends OpenAPIRoute {
     schema = {
         request: {
-            query: PaginationWithOrderSchema,
+            query: GetLeaderboardQuerySchema,
         },
         responses: {
             200: {

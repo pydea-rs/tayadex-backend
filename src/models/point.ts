@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PublicUserSchema } from "./user";
 import { ProcessedTransactionSchema } from "./transaction";
+import { PaginationWithOrderSchema } from "./common";
 
 export const PointHistoryItemSchema = z.object({
     id: z.bigint(),
@@ -40,3 +41,17 @@ export const LeaderboardRankingItemWithPositionSchema =
         .nullable()
         .describe("The ranking data of a specific user");
 export const LeaderboardTableSchema = z.array(LeaderboardRankingItemSchema);
+
+export enum LeaderboardSortOptionsEnum {
+    BY_REFERRALS = "referrals",
+    BY_QUESTS = "quests",
+    BY_TOTAL_POINT = "total",
+}
+
+export const LeaderboardSortOptionsEnumSchema = z.enum(
+    Object.values(LeaderboardSortOptionsEnum) as [string, ...string[]]
+);
+
+export const GetLeaderboardQuerySchema = PaginationWithOrderSchema.extend({
+    sortBy: LeaderboardSortOptionsEnumSchema,
+});
