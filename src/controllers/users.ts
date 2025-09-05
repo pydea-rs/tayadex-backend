@@ -1,4 +1,4 @@
-import { PointHistorySchema, UserSchema } from "@/models";
+import { PointHistoryTableSchema, UserSchema } from "@/models";
 import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
 import { PointService, ReferralService } from "@/services";
 import {
@@ -132,7 +132,7 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
                     "Get single user's point history; showing all the points he collected through time.",
                 content: {
                     "application/json": {
-                        schema: PointHistorySchema,
+                        schema: PointHistoryTableSchema,
                     },
                 },
             },

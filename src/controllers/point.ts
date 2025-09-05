@@ -1,9 +1,8 @@
-import { PointHistorySchema } from "@/models";
+import { PointHistoryTableSchema, LeaderboardTableSchema } from "@/models";
 import { PaginationWithOrderSchema } from "@/models/common";
 import { PointService } from "@/services";
 import type { AppContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
-import { z } from "zod";
 
 export class GetPointBoardRoute extends OpenAPIRoute {
     schema = {
@@ -16,7 +15,7 @@ export class GetPointBoardRoute extends OpenAPIRoute {
                     "Get poinmt board as an object linking users id to their current point value.",
                 content: {
                     "application/json": {
-                        schema: z.record(z.number(), z.number()),
+                        schema: LeaderboardTableSchema,
                     },
                 },
             },
@@ -40,7 +39,7 @@ export class GetPointHistoryRoute extends OpenAPIRoute {
                     "Get all users point history; showing all the points he collected through time by all users.",
                 content: {
                     "application/json": {
-                        schema: PointHistorySchema,
+                        schema: PointHistoryTableSchema,
                     },
                 },
             },

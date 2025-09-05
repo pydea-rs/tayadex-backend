@@ -223,10 +223,12 @@ export class PointService {
         const results = await prisma.$queryRaw<
             {
                 userId: number;
-                totalPoints: number;
                 userName: string | null;
                 userAddress: string;
                 userCreatedAt: Date;
+                totalPoints: number;
+                referrals: number;
+                quests: number;
             }[]
         >`
             ${this.LEADERBOARD_BASE_QUERY}
@@ -412,5 +414,21 @@ export class PointService {
         });
         return result._sum.amount ?? 0;
     }
-    
+
+    async getOnesRanking(userId: number) {
+        const results = await prisma.$queryRaw<
+            {
+                userId: number;
+                totalPoints: number;
+                userName: string | null;
+                userAddress: string;
+                userCreatedAt: Date;
+            }[]
+        >`
+            ${this.LEADERBOARD_BASE_QUERY}
+            WHERE ph."user_id" IS NOT NULL
+            GROUP BY ph."user_id", u.name, u.address, u.created_at
+        `;
+        return results;
+    }
 }
