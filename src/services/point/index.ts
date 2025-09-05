@@ -229,13 +229,14 @@ export class PointService {
             extraCommands = Prisma.sql`${extraCommands} OFFSET ${skip}`;
         }
 
-        const orderBy =
-            sortBy.toString() !==
-            LeaderboardSortOptionsEnum.BY_TOTAL_POINT.toString()
-                ? Prisma.sql`"${sortBy.toString()}"`
-                : Prisma.sql`"totalPoints"`;
+        const orderBy = {
+            [LeaderboardSortOptionsEnum.BY_TOTAL_POINT]: Prisma.sql`"totalPoints"`,
+            [LeaderboardSortOptionsEnum.BY_QUESTS]: Prisma.sql`"quests"`,
+            [LeaderboardSortOptionsEnum.BY_REFERRALS]: Prisma.sql`"referrals"`,
+        }[sortBy];
 
         const sortMode = descending ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    
         const results = await prisma.$queryRaw<
             {
                 userId: number;

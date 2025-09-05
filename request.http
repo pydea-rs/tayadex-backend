@@ -17,7 +17,7 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 ### get leaderboard
-GET {{host}}/point?sortBy=total&take=10&skip=0
+GET {{host}}/point?sortBy=referrals&take=10&skip=0
 Content-Type: application/json
 
 ### patch profile
