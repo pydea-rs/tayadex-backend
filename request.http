@@ -15,7 +15,7 @@ Authorization: Bearer {{token}}
 
 {
     "name": "test",
-    "email": "Test@g.com"
+    "email": "Teste@g.com"
 }
 
 ### get nonce

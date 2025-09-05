@@ -1,15 +1,19 @@
-import { LeaderboardRankingItemWithPositionSchema, PointHistoryTableSchema, UserSchema } from "@/models";
-import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
-import { PointService, ReferralService } from "@/services";
 import {
+    LeaderboardRankingItemWithPositionSchema,
+    PointHistoryTableSchema,
+    UserProfileWithFinancialDataSchema,
+    UserSchema,
     UserPrivateProfileDto,
     UserPublicProfileDto,
-    type AppContext,
-    type AuthContext,
-} from "@/types";
+    FinancialStatisticsSchema,
+} from "@/models";
+import { PaginationSchema, PaginationWithOrderSchema } from "@/models/common";
+import { PointService, ReferralService } from "@/services";
+import { type AppContext, type AuthContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
 import { z } from "zod";
 import { UserService } from "@/services/user";
+import { TransactionsService } from "@/services/transaction";
 
 export class GetUsersRoute extends OpenAPIRoute {
     private userService = UserService.get();
@@ -87,7 +91,7 @@ export class GetUserPointRoute extends OpenAPIRoute {
         responses: {
             200: {
                 description:
-                    "Get single user's point endpoint; Returns a value as point.",
+                    "Get single user's ranking position and point data.",
                 content: {
                     "application/json": {
                         schema: LeaderboardRankingItemWithPositionSchema,
@@ -170,7 +174,7 @@ export class GetProfileRoute extends OpenAPIRoute {
                 description: "Get authenticated user profile",
                 content: {
                     "application/json": {
-                        schema: UserPrivateProfileDto,
+                        schema: UserProfileWithFinancialDataSchema,
                     },
                 },
             },
@@ -188,8 +192,13 @@ export class GetProfileRoute extends OpenAPIRoute {
     };
 
     async handle(ctx: AuthContext) {
-        const user = { ...ctx.var.user }; // returning a copy of the object for reassurance.
-        return user;
+        if (!ctx.var.user) {
+            return ctx.json({ error: "Not authorized!" }, 401);
+        }
+        const financials = await TransactionsService.get().getFinancialStats({
+            userId: ctx.var.user.id,
+        });
+        return { ...ctx.var.user, financials };
     }
 }
 
@@ -249,10 +258,10 @@ export class PatchUserRoute extends OpenAPIRoute {
         } = await this.getValidatedData<typeof this.schema>();
 
         const { user } = ctx.var;
-        
+
         try {
-            if(!user) {
-                return ctx.json({ error: "Authentication failed." }, 401)
+            if (!user) {
+                return ctx.json({ error: "Authentication failed." }, 401);
             }
             if (
                 (!email?.length ||
@@ -271,22 +280,53 @@ export class PatchUserRoute extends OpenAPIRoute {
                 await this.referralService.linkUserToReferrers(
                     user,
                     referralCode,
-                    true,
+                    true
                 );
             }
-            
-            if(email?.length) {
+
+            if (email?.length) {
                 user.email = email.trim().toLowerCase();
             }
-            
-            if(name?.length) {
+
+            if (name?.length) {
                 user.name = name;
             }
-            
+
             await this.userService.updateUser(user);
             return user;
         } catch (ex) {
             return ctx.json({ error: (ex as Error).message }, 400);
         }
+    }
+}
+
+export class GetUserFinancialsStatsRoute extends OpenAPIRoute {
+    private transactionsService = TransactionsService.get();
+
+    schema = {
+        request: {
+            params: z.object({
+                id: z.number().describe("User id"),
+            }),
+        },
+        responses: {
+            200: {
+                description:
+                    "Get single user's general financial statistics, such as total volume, total liquidity provision (LP), etc.",
+                content: {
+                    "application/json": {
+                        schema: FinancialStatisticsSchema,
+                    },
+                },
+            },
+        },
+    };
+
+    async handle(ctx: AppContext) {
+        const {
+            params: { id },
+        } = await this.getValidatedData<typeof this.schema>();
+
+        return this.transactionsService.getFinancialStats({ userId: id });
     }
 }

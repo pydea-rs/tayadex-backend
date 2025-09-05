@@ -15,3 +15,29 @@ export const ProcessedTransactionSchema = z.object({
     processedAt: z.date().optional().nullable().optional(),
     userId: z.number().int().optional().nullable().optional(),
 });
+
+export const FinancialStatisticsSchema = z.object({
+    swapExtractedVolume: z
+        .number()
+        .describe(
+            "Total amount of tokens user has received from performing swaps"
+        ),
+    swapInjectedVolume: z
+        .number()
+        .describe(
+            "Total amount of tokens user has entered the pool while swapping"
+        ),
+    totalLiquidityProvision: z
+        .number()
+        .describe("Total amount of token user has minted in liquidity pools."),
+    totalExtractedLiquidity: z
+        .number()
+        .describe(
+            "Total amount of tokens user has extracted by removing liquidity."
+        ),
+    totalVolume: z
+        .number()
+        .describe(
+            "Total amount of tokens user has transfered in or out while doing swapps."
+        ),
+});
