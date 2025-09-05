@@ -1,5 +1,11 @@
-# @host = https://graph-monad.kindynos.mx/api
-@host = http://localhost:4200/api
+@host = https://graph-monad.kindynos.mx/api
+# @host = http://localhost:4200/api
+
+### get profile
+GET {{host}}/user
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjI2MjQsImFkZHJlc3MiOiIweEE4ZUExNTAzODkyNjE4OGU3YmQ0NDY2ZDNlYjRiM2MxMTM4NjY0NDUiLCJpYXQiOjE3NTY5NzI5MDAsImV4cCI6MTc1NzE0NTcwMCwiaXNzIjoiUGF5YVNheXNUaGVXb3JkIn0.2ljI06YTN8VplI8Ncy49H86iRV5cwuAFTogwpgSlRr4
+
 
 ### get nonce
 GET {{host}}/auth/nonce?address=0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363

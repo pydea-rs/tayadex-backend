@@ -238,20 +238,54 @@ export class PointService {
         return results;
     }
 
-    async getPointBoardWithDetails() {
-        // Approach 2: Using groupBy then fetching user details
-        const pointSums = await prisma.pointHistory.groupBy({
-            by: ["userId"],
-            _sum: { amount: true },
-            where: { userId: { not: null } },
-            orderBy: {
-                _sum: {
-                    amount: "desc",
+    async getPointBoardWithFullDetails(
+        paginationData: {
+            take?: number;
+            skip?: number;
+            orderDescending?: boolean;
+        } = {}
+    ) {
+        const [pointSums, referralsSum, questsSum] = await Promise.all([
+            prisma.pointHistory.groupBy({
+                by: ["userId"],
+                _sum: { amount: true },
+                where: { userId: { not: null } },
+                orderBy: {
+                    _sum: {
+                        amount: paginationData.orderDescending ? "desc" : "asc",
+                    },
                 },
-            },
-        });
+                ...(paginationData?.take ? { take: +paginationData.take } : {}),
+                ...(paginationData?.skip ? { skip: +paginationData.skip } : {}),
+            }),
+            prisma.pointHistory.groupBy({
+                by: ["userId"],
+                _sum: { amount: true },
+                where: {
+                    userId: { not: null },
+                    source: {
+                        in: [
+                            PointSources.DIRECT_REFERRAL,
+                            PointSources.INDIRECT_REFERRAL,
+                        ],
+                    },
+                },
+            }),
+            prisma.pointHistory.groupBy({
+                by: ["userId"],
+                _sum: { amount: true },
+                where: {
+                    userId: { not: null },
+                    source: {
+                        in: [
+                            PointSources.SOCIAL_ACTIVITY,
+                            PointSources.ONCHAIN_ACTIVITY,
+                        ],
+                    },
+                },
+            }),
+        ]);
 
-        // Get user details for each userId
         const userIds = pointSums
             .map((p) => p.userId)
             .filter((id) => id !== null);
@@ -262,20 +296,32 @@ export class PointService {
                 name: true,
                 address: true,
                 createdAt: true,
-                // ...
+                avatarId: true,
+                avatar: true,
             },
         });
 
-        const userMap = new Map(users.map((user) => [user.id, user]));
+        const userMap = new Map(users.map((user) => [user.id, user])),
+            referralsSumMap = new Map(
+                referralsSum.map((rs) => [rs.userId, rs._sum])
+            ),
+            questsSumMap = new Map(questsSum.map((qs) => [qs.userId, qs._sum]));
+
         return pointSums.map((pointSum) => ({
-            userId: pointSum.userId,
             totalPoints: pointSum._sum.amount ?? 0,
+            quests: questsSumMap.get(pointSum.userId),
+            referrals: referralsSumMap.get(pointSum.userId),
             user: userMap.get(pointSum.userId!) ?? null,
         }));
     }
 
-    async getPointBoardWithHistory() {
-        // Approach 3: Get detailed point history with user and rule info
+    async getPointHistory(
+        paginationData: {
+            take?: number;
+            skip?: number;
+            orderDescending?: boolean;
+        } = {}
+    ) {
         const results = await prisma.pointHistory.findMany({
             where: { userId: { not: null } },
             include: {
@@ -310,7 +356,6 @@ export class PointService {
             orderBy: { createdAt: "desc" },
         });
 
-        // Group by user and calculate totals
         const userPointsMap = new Map<
             number,
             {
@@ -342,10 +387,22 @@ export class PointService {
             });
         });
 
-        // Convert to array and sort by total points
-        return Array.from(userPointsMap.values()).sort(
-            (a, b) => b.totalPoints - a.totalPoints
+        const finalResults = Array.from(userPointsMap.values()).sort(
+            (a, b) =>
+                (b.totalPoints - a.totalPoints) *
+                (paginationData?.orderDescending ? 1 : -1)
         );
+        if (paginationData.skip) {
+            return paginationData.take
+                ? finalResults.slice(
+                      +paginationData.skip,
+                      +paginationData.skip + +paginationData.take
+                  )
+                : finalResults.slice(+paginationData.skip);
+        }
+        return !paginationData.take
+            ? finalResults
+            : finalResults.slice(0, +paginationData.take);
     }
 
     async getOnesPoint(userId: number) {
@@ -355,4 +412,5 @@ export class PointService {
         });
         return result._sum.amount ?? 0;
     }
+    
 }
