@@ -50,7 +50,7 @@ export enum LeaderboardSortOptionsEnum {
 
 export const LeaderboardSortOptionsEnumSchema = z.enum(
     Object.values(LeaderboardSortOptionsEnum) as [string, ...string[]]
-);
+).default('total');
 
 export const GetLeaderboardQuerySchema = PaginationWithOrderSchema.extend({
     sortBy: LeaderboardSortOptionsEnumSchema,

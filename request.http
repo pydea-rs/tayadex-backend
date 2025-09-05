@@ -1,12 +1,24 @@
-# @host = https://graph-monad.kindynos.mx/api
+@host = https://graph-monad.kindynos.mx/api
 @host = http://localhost:4200/api
 
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImFkZHJlc3MiOiIweDk4NjBlMmI0MDc5NDUyQzQxZjg2QUVDNURhMEY1QzhiNDNiNDIzNjMiLCJpYXQiOjE3NTcwNTUzODYsImV4cCI6MTc1NzIyODE4NiwiaXNzIjoiUGF5YVNheXNUaGVXb3JkIn0.IVvd7utXcTsPi0zMFrucDzSjZ-WertUAOJU86tjU0kA
-
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjI2MjQsImFkZHJlc3MiOiIweEE4ZUExNTAzODkyNjE4OGU3YmQ0NDY2ZDNlYjRiM2MxMTM4NjY0NDUiLCJpYXQiOjE3NTY5NzI5MDAsImV4cCI6MTc1NzE0NTcwMCwiaXNzIjoiUGF5YVNheXNUaGVXb3JkIn0.2ljI06YTN8VplI8Ncy49H86iRV5cwuAFTogwpgSlRr4
 ### get profile
 GET {{host}}/user/profile
 Content-Type: application/json
 Authorization: Bearer {{token}}
+
+### get app stats
+GET {{host}}/stats
+Content-Type: application/json
+
+### get user ranking
+GET {{host}}/user/point
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+### get leaderboard
+GET {{host}}/point?sortBy=total&take=10&skip=0
+Content-Type: application/json
 
 ### patch profile
 PATCH {{host}}/user/profile

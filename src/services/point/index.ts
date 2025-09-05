@@ -2,6 +2,7 @@ import {
     PointSources,
     type PointSystemRule,
     PointSystemRuleType,
+    Prisma,
     type ProcessedTransaction,
     type ReferralRules,
     TransactionType,
@@ -13,16 +14,16 @@ import { LeaderboardSortOptionsEnum } from "@/models";
 
 export class PointService {
     private static singleInstance: PointService;
-    private readonly LEADERBOARD_BASE_QUERY = `SELECT 
+    private readonly LEADERBOARD_BASE_QUERY = Prisma.sql`SELECT 
                 ph."user_id" as "userId",
                 u.name as "userName",
                 u.address as "userAddress",
-                u.created_at as "userCreatedAt"
+                u.created_at as "userCreatedAt",
                 SUM(ph.amount) as "totalPoints",
-                SUM(CASE WHEN ph.source IN ('${PointSources.DIRECT_REFERRAL}', '${PointSources.INDIRECT_REFERRAL}') 
+                SUM(CASE WHEN ph.source IN (${PointSources.DIRECT_REFERRAL}::"PointSources", ${PointSources.INDIRECT_REFERRAL}::"PointSources") 
                     THEN ph.amount ELSE 0 END) as "referrals",
-                SUM(CASE WHEN ph.source IN ('${PointSources.SOCIAL_ACTIVITY}', '${PointSources.ONCHAIN_ACTIVITY}') 
-                    THEN ph.amount ELSE 0 END) as "quests",
+                SUM(CASE WHEN ph.source IN (${PointSources.SOCIAL_ACTIVITY}::"PointSources", ${PointSources.ONCHAIN_ACTIVITY}::"PointSources") 
+                    THEN ph.amount ELSE 0 END) as "quests"
             FROM "PointHistory" ph
             LEFT JOIN "User" u ON ph."user_id" = u.id`;
 
@@ -217,22 +218,24 @@ export class PointService {
     }: {
         take?: number;
         skip?: number;
-        sortBy?: LeaderboardSortOptionsEnum;
+        sortBy?: LeaderboardSortOptionsEnum | string;
         descending?: boolean;
     } = {}) {
-        let extraCommands = "";
+        let extraCommands = Prisma.empty;
         if (take) {
-            extraCommands += ` LIMIT ${take}`;
+            extraCommands = Prisma.sql` LIMIT ${take}`;
         }
         if (skip) {
-            extraCommands += ` OFFSET ${skip}`;
+            extraCommands = Prisma.sql`${extraCommands} OFFSET ${skip}`;
         }
 
         const orderBy =
-            sortBy !== LeaderboardSortOptionsEnum.BY_TOTAL_POINT
-                ? sortBy.toString()
-                : "totalPoints";
+            sortBy.toString() !==
+            LeaderboardSortOptionsEnum.BY_TOTAL_POINT.toString()
+                ? Prisma.sql`"${sortBy.toString()}"`
+                : Prisma.sql`"totalPoints"`;
 
+        const sortMode = descending ? Prisma.sql`DESC` : Prisma.sql`ASC`;
         const results = await prisma.$queryRaw<
             {
                 userId: number;
@@ -247,9 +250,9 @@ export class PointService {
             ${this.LEADERBOARD_BASE_QUERY}
             WHERE ph."user_id" IS NOT NULL
             GROUP BY ph."user_id", u.name, u.address, u.created_at
-            ORDER BY "${orderBy}" ${descending ? "DESC" : "ASC"}
-            ${extraCommands}
-        `; // TODO: Checkout if all these groupBy items are necessary (in this func and also getOnesRanking function)
+            ORDER BY ${orderBy} ${sortMode}
+            ${extraCommands}`; // TODO: Checkout if all these groupBy items are necessary (in this func and also getOnesRanking function)
+
         return results;
     }
 
