@@ -210,7 +210,7 @@ export class PointService {
         return this.getHistory({ userId, ...paginationData });
     }
 
-    async getPointBoard({
+    async getLeaderboard({
         take = undefined,
         skip = undefined,
         sortBy = LeaderboardSortOptionsEnum.BY_TOTAL_POINT,
@@ -236,7 +236,7 @@ export class PointService {
         }[sortBy];
 
         const sortMode = descending ? Prisma.sql`DESC` : Prisma.sql`ASC`;
-    
+
         const results = await prisma.$queryRaw<
             {
                 userId: number;
@@ -257,7 +257,7 @@ export class PointService {
         return results;
     }
 
-    async getPointBoardWithFullDetails(
+    async getLeaderboardWithUserProfile(
         paginationData: {
             take?: number;
             skip?: number;
@@ -334,7 +334,7 @@ export class PointService {
         }));
     }
 
-    async getPointHistory(
+    async getLeaderboardWithHistory(
         paginationData: {
             take?: number;
             skip?: number;
@@ -369,6 +369,7 @@ export class PointService {
                         token0: true,
                         token1: true,
                         createdAt: true,
+                        blockNumber: true
                     },
                 },
             },
@@ -380,7 +381,27 @@ export class PointService {
             {
                 user: any;
                 totalPoints: number;
-                pointEntries: any[];
+                pointEntries: {
+                    id: bigint | string;
+                    amount: number;
+                    createdAt: Date;
+                    rule: {
+                        id: number;
+                        type: PointSystemRuleType;
+                        transactionType: TransactionType;
+                        baseValue: number;
+                        relativeValue: number;
+                    } | null;
+                    transaction: {
+                        id?: bigint | string;
+                        createdAt: Date;
+                        type: TransactionType;
+                        token0: string;
+                        token1: string | null;
+                        hash: string;
+                        blockNumber?: bigint | string;
+                    } | null;
+                }[];
             }
         >();
 
@@ -398,11 +419,17 @@ export class PointService {
             const userData = userPointsMap.get(entry.userId)!;
             userData.totalPoints += entry.amount;
             userData.pointEntries.push({
-                id: entry.id,
+                id: entry.id.toString(),
                 amount: entry.amount,
                 createdAt: entry.createdAt,
                 rule: entry.rule,
-                transaction: entry.transaction,
+                transaction: entry?.transaction
+                    ? {
+                          ...entry.transaction,
+                          id: entry.transactionId?.toString(),
+                          blockNumber: entry.transaction.blockNumber?.toString(),
+                      }
+                    : null,
             });
         });
 
@@ -436,12 +463,12 @@ export class PointService {
         const user = await prisma.$queryRaw<
             {
                 userId: number;
+                userName: string | null;
+                userAddress: string;
+                userCreatedAt: Date;
                 totalPoints: number;
                 referrals: number;
                 quests: number;
-                userName: string;
-                userAddress: string;
-                userCreatedAt: Date;
                 position: number;
             }[]
         >`WITH user_totals AS (

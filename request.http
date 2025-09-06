@@ -12,15 +12,30 @@ GET {{host}}/stats
 Content-Type: application/json
 
 ### get user ranking
+GET {{host}}/user/4426/ranking
+Content-Type: application/json
+
+
+### get user point history (all points the user has achieved so far)
+GET {{host}}/user/4426/points
+Content-Type: application/json
+
+
+### get user general volumes and staff
 GET {{host}}/user/4426/financials
 Content-Type: application/json
 
 ### get leaderboard
-GET {{host}}/point?take=10&skip=10&sortBy=referrals
+GET {{host}}/point/leaderboard?take=10&skip=10&sortBy=referrals
 Content-Type: application/json
 
-### get point history
+### get [all users] point history;
 GET {{host}}/point/history?take=10
+Content-Type: application/json
+
+
+### get leaderboard, with each user's point history alongside them.
+GET {{host}}/point/leaderboard/history?take=10&skip=10
 Content-Type: application/json
 
 ### patch profile
@@ -44,7 +59,7 @@ Content-Type: application/json
 {
 
     "address": "0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363",
-    "signature": "0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363",
+    "signature": "0xSigned",
     "message": "Welcome to Tayadex!\n\nClick to sign in and accept the Tayadex Terms of Service.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet: 0x9860e2b4079452C41f86AEC5Da0F5C8b43b42363\nNonce: 0ek0teawhu1m8f5svzty8ai\nTimestamp: 2025-09-02T23:40:43.805Z"
 
 }

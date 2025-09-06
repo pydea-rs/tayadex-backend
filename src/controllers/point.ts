@@ -1,10 +1,15 @@
-import { PointHistoryTableSchema, LeaderboardTableSchema, GetLeaderboardQuerySchema } from "@/models";
+import {
+    PointHistoryTableSchema,
+    LeaderboardTableSchema,
+    GetLeaderboardQuerySchema,
+} from "@/models";
 import { PaginationWithOrderSchema } from "@/models/common";
 import { PointService } from "@/services";
 import type { AppContext } from "@/types";
 import { OpenAPIRoute } from "chanfana";
+import { z } from "zod";
 
-export class GetPointBoardRoute extends OpenAPIRoute {
+export class GetLeaderBoardRoute extends OpenAPIRoute {
     schema = {
         request: {
             query: GetLeaderboardQuerySchema,
@@ -12,7 +17,7 @@ export class GetPointBoardRoute extends OpenAPIRoute {
         responses: {
             200: {
                 description:
-                    "Get poinmt board as an object linking users id to their current point value.",
+                    "Get leaderboard based on points and different sort options.",
                 content: {
                     "application/json": {
                         schema: LeaderboardTableSchema,
@@ -24,7 +29,31 @@ export class GetPointBoardRoute extends OpenAPIRoute {
 
     async handle(ctx: AppContext) {
         const { query } = await this.getValidatedData<typeof this.schema>();
-        return PointService.get().getPointBoard(query);
+        return PointService.get().getLeaderboard(query);
+    }
+}
+
+export class GetLeaderBoardWithHistoryRoute extends OpenAPIRoute {
+    schema = {
+        request: {
+            query: PaginationWithOrderSchema,
+        },
+        responses: {
+            200: {
+                description:
+                    "Get leaderboard, sorted by total points, featuring each user's full point history.",
+                content: {
+                    "application/json": {
+                        schema: z.array(z.record(z.string(), z.any())),
+                    },
+                },
+            },
+        },
+    };
+
+    async handle(ctx: AppContext) {
+        const { query } = await this.getValidatedData<typeof this.schema>();
+        return PointService.get().getLeaderboardWithHistory(query);
     }
 }
 
