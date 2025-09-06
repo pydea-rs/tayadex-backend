@@ -79,7 +79,7 @@ export class GetSingleUserRoute extends OpenAPIRoute {
     }
 }
 
-export class GetUserPointRoute extends OpenAPIRoute {
+export class GetUserRankingRoute extends OpenAPIRoute {
     private pointService = PointService.get();
 
     schema = {

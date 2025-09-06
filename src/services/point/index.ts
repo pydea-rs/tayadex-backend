@@ -479,7 +479,7 @@ export class PointService {
         SELECT 
             ut.*,
             (
-                SELECT COUNT(*) 
+                SELECT COUNT(*)::INT
                 FROM (
                     SELECT ph2."user_id", SUM(ph2.amount) as totalPoints
                     FROM "PointHistory" ph2

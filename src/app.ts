@@ -5,7 +5,7 @@ import {
     GetSingleUserRoute,
     GetTaskVerify,
     GetUserPointHistoryRoute,
-    GetUserPointRoute,
+    GetUserRankingRoute,
     GetUsersRoute,
     GetProfileRoute,
     PatchUserRoute,
@@ -25,7 +25,7 @@ openapi.get("/api/quote", GetQuote);
 AuthGuard.get("/api/user/profile", GetProfileRoute);
 openapi.get("api/user", GetUsersRoute);
 AuthGuard.patch("/api/user/profile", PatchUserRoute);
-openapi.get("api/user/:id/ranking", GetUserPointRoute);
+openapi.get("api/user/:id/ranking", GetUserRankingRoute);
 openapi.get("api/user/:id/points", GetUserPointHistoryRoute);
 openapi.get("api/user/:id/financials", GetUserFinancialsStatsRoute);
 openapi.get("api/user/:ident", GetSingleUserRoute);
