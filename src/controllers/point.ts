@@ -25,6 +25,8 @@ export class GetLeaderBoardRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Leaderboard endpoint featuring brief point data.',
+        tags: ['Point', 'Leaderboard']
     };
 
     async handle(ctx: AppContext) {
@@ -49,6 +51,8 @@ export class GetLeaderBoardWithHistoryRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Returns the leaderboard, but also the point history of each user in the list (Leaderboard endpoint with full historical data).',
+        tags: ['Point', 'Leaderboard']
     };
 
     async handle(ctx: AppContext) {
@@ -73,6 +77,8 @@ export class GetPointHistoryRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Get point history of all users so far, showing the flow of point changes in time.',
+        tags: ['Point']
     };
 
     async handle(ctx: AppContext) {

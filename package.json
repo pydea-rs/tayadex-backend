@@ -6,7 +6,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "init": "node prisma/seed.db.js",
-    "build": "tsup src/server.ts --format esm --out-dir dist --splitting --clean --dts",
+    "build": "tsup src/server.ts --format cjs --out-dir dist --clean --dts",
     "format": "biome format --max-diagnostics 100 --write ./",
     "lint": "biome lint --write --unsafe --max-diagnostics 100 ./"
   },

@@ -56,6 +56,8 @@ export class GetNonceRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Get the nonce and message to be signed.',
+        tags: ['Auth']
     };
 
     async handle(ctx: AppContext) {
@@ -133,6 +135,8 @@ export class Web3LoginRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'After getting the message to sign, This endpoint should be called with the signed message to validate user login/register.',
+        tags: ['Auth']
     };
 
     async handle(ctx: AppContext) {

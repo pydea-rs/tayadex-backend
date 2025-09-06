@@ -32,6 +32,8 @@ export class GetUsersRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Fetch the list of all users registered into our system so far.',
+        tags: ['User']
     };
 
     async handle(ctx: AppContext) {
@@ -61,6 +63,8 @@ export class GetSingleUserRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Get public data of a specific user.',
+        tags: ['User']
     };
 
     async handle(ctx: AppContext) {
@@ -109,6 +113,8 @@ export class GetUserRankingRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Returns the position of the user in leaderboard, alongside his/hers point info.',
+        tags: ['User', 'Point', 'Leaderboard']
     };
 
     async handle(ctx: AppContext) {
@@ -141,6 +147,8 @@ export class GetUserPointHistoryRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Returns the history of user gaining points in out system.',
+        tags: ['User', 'Point']
     };
 
     async handle(ctx: AppContext) {
@@ -190,6 +198,8 @@ export class GetProfileRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Returns users private data alongside their general financial statistics.',
+        tags: ['User']
     };
 
     async handle(ctx: AuthContext) {
@@ -251,6 +261,8 @@ export class PatchUserRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Update user data; Also can be used in Complete User Data form while registering (to set referral code).',
+        tags: ['User']
     };
 
     async handle(ctx: AuthContext) {
@@ -321,6 +333,8 @@ export class GetUserFinancialsStatsRoute extends OpenAPIRoute {
                 },
             },
         },
+        description: 'Get general statistics of users financial activity so far.',
+        tags: ['User', 'Transactions']
     };
 
     async handle(ctx: AppContext) {
