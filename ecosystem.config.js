@@ -2,7 +2,7 @@ module.exports = {
     apps: [
       {
         name: "tayadex-backend",
-        script: "./dist/server.mjs",
+        script: "./dist/server.js",
         cwd: "./",
         instances: 1,
         exec_mode: "fork",
